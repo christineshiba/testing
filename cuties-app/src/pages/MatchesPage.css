@@ -1,0 +1,144 @@
+.matches-page {
+  min-height: calc(100vh - 80px);
+  background: linear-gradient(to bottom, #f8f9ff 0%, #ffffff 100%);
+  padding: 2rem;
+}
+
+.matches-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.matches-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #1a1a1a;
+}
+
+.no-matches {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: 25px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.no-matches-icon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+}
+
+.no-matches h2 {
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+  color: #1a1a1a;
+}
+
+.no-matches p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}
+
+.discover-link {
+  display: inline-block;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 25px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.discover-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.matches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.match-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.match-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.match-image {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  overflow: hidden;
+}
+
+.match-image img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.match-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(102, 126, 234, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.match-card:hover .match-overlay {
+  opacity: 1;
+}
+
+.chat-icon {
+  font-size: 3rem;
+}
+
+.match-info {
+  padding: 1rem;
+}
+
+.match-info h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem 0;
+  color: #1a1a1a;
+}
+
+.match-info p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .matches-page {
+    padding: 1rem;
+  }
+
+  .matches-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+}
