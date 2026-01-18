@@ -15,24 +15,30 @@ const Header = () => {
     <header className="header">
       <div className="header-content">
         <Link to="/" className="logo">
-          <span className="logo-text">cuties</span>
-          <span className="logo-emoji">💕</span>
+          cuties!
         </Link>
 
         <nav className="nav">
           {isAuthenticated ? (
             <>
-              <Link to="/discover" className="nav-link">
-                Discover
+              <Link to="/invite" className="nav-link">
+                🎁 Invite friends
+              </Link>
+              <Link to="/directory" className="nav-link">
+                Directory
+              </Link>
+              <Link to="/profile" className="nav-link">
+                My Profile
               </Link>
               <Link to="/matches" className="nav-link">
                 Matches
+                <span className="notification-dot"></span>
               </Link>
-              <Link to="/profile" className="nav-link">
-                Profile
+              <Link to="/premium" className="nav-link">
+                Premium
               </Link>
-              <button onClick={handleLogout} className="nav-link logout-btn">
-                Logout
+              <button onClick={handleLogout} className="nav-link">
+                Log out
               </button>
             </>
           ) : (
@@ -40,7 +46,7 @@ const Header = () => {
               <Link to="/login" className="nav-link">
                 Login
               </Link>
-              <Link to="/signup" className="btn-primary">
+              <Link to="/signup" className="nav-link">
                 Sign Up
               </Link>
             </>
