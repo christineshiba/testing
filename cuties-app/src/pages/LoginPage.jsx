@@ -17,12 +17,18 @@ const LoginPage = () => {
       name: 'Demo User',
       email,
       age: 25,
+      gender: 'They / Them',
       location: 'San Francisco, CA',
       bio: '👋 Just exploring the app!',
+      quickBio: 'Exploring and connecting',
       interests: ['Technology', 'Music', 'Travel', 'Food'],
       photos: ['https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400'],
+      hereFor: ['Friends', 'Collaboration'],
+      communities: ['Vibecamp', 'SF Commons'],
+      socials: { twitter: 'demouser', instagram: 'demo.user' },
+      promptQuestion: 'What brings you here?',
     });
-    navigate('/discover');
+    navigate('/directory');
   };
 
   return (
@@ -30,7 +36,6 @@ const LoginPage = () => {
       <div className="auth-container">
         <div className="auth-card">
           <h1 className="auth-title">Welcome back!</h1>
-          <p className="auth-subtitle">Login to continue your journey</p>
 
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">

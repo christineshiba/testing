@@ -22,9 +22,9 @@ const MatchesPage = () => {
           <div className="no-matches">
             <div className="no-matches-icon">💕</div>
             <h2>No matches yet</h2>
-            <p>Start swiping to find your community!</p>
-            <Link to="/discover" className="discover-link">
-              Go to Discover
+            <p>Browse the directory to find your community!</p>
+            <Link to="/directory" className="discover-link">
+              Go to Directory
             </Link>
           </div>
         ) : (

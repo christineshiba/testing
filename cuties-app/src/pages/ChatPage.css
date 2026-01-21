@@ -1,6 +1,6 @@
 .chat-page {
   min-height: calc(100vh - 80px);
-  background: #f8f9ff;
+  background: #f5eff5;
 }
 
 .chat-container {
@@ -25,7 +25,7 @@
 }
 
 .back-button {
-  color: #667eea;
+  color: #1a1a2e;
   text-decoration: none;
   font-weight: 600;
   transition: opacity 0.2s;
@@ -102,7 +102,7 @@
 }
 
 .message-sent .message-content {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #1a1a2e;
   color: white;
   border-bottom-right-radius: 5px;
 }
@@ -143,11 +143,11 @@
 
 .chat-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #1a1a2e;
 }
 
 .send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #1a1a2e;
   color: white;
   padding: 0.875rem 2rem;
   border: none;
@@ -159,8 +159,8 @@
 }
 
 .send-button:hover {
+  background: #2a2a4e;
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
 .send-button:active {
@@ -177,7 +177,7 @@
 }
 
 .user-not-found a {
-  color: #667eea;
+  color: #1a1a2e;
   text-decoration: none;
   font-weight: 600;
 }

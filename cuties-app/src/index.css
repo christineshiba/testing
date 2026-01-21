@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
 :root {
   --pink-bg: #f5eff5;
   --navy: #1a1a2e;
@@ -7,23 +9,32 @@
   --border: #e0d5e0;
   --white: #ffffff;
   --accent-pink: #fde8f5;
+  --blue: #3b5bdb;
+  --love-pink: #ffe0e6;
+  --love-pink-text: #d63b5c;
+  --tag-blue: #e0f0ff;
+  --tag-blue-text: #0066cc;
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--pink-bg);
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 14px;
 }
 
 #root {
@@ -37,4 +48,8 @@ button {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+input, textarea, select {
+  font-family: inherit;
 }

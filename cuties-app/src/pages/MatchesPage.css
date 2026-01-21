@@ -1,6 +1,6 @@
 .matches-page {
   min-height: calc(100vh - 80px);
-  background: linear-gradient(to bottom, #f8f9ff 0%, #ffffff 100%);
+  background: #f5eff5;
   padding: 2rem;
 }
 
@@ -43,7 +43,7 @@
 
 .discover-link {
   display: inline-block;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #1a1a2e;
   color: white;
   padding: 1rem 2rem;
   border-radius: 25px;
@@ -53,8 +53,8 @@
 }
 
 .discover-link:hover {
+  background: #2a2a4e;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 .matches-grid {
@@ -100,7 +100,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(102, 126, 234, 0.9);
+  background: rgba(26, 26, 46, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;

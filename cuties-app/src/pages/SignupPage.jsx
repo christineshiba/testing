@@ -5,10 +5,8 @@ import './AuthPages.css';
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
     password: '',
-    age: '',
   });
   const { login } = useApp();
   const navigate = useNavigate();
@@ -25,38 +23,24 @@ const SignupPage = () => {
     // Mock signup - in a real app, this would create a new account
     login({
       id: 'user-new',
-      name: formData.name,
+      name: 'New User',
       email: formData.email,
-      age: parseInt(formData.age),
+      age: 25,
       location: 'San Francisco, CA',
-      bio: '👋 New to cuties!',
+      bio: 'New to cuties!',
       interests: ['Music', 'Travel'],
       photos: ['https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400'],
     });
-    navigate('/discover');
+    navigate('/directory');
   };
 
   return (
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-card">
-          <h1 className="auth-title">Join Cuties</h1>
-          <p className="auth-subtitle">Start making meaningful connections</p>
+          <h1 className="auth-title">Sign up to create a profile</h1>
 
           <form onSubmit={handleSubmit} className="auth-form">
-            <div className="form-group">
-              <label htmlFor="name">Name</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Your name"
-                required
-              />
-            </div>
-
             <div className="form-group">
               <label htmlFor="email">Email</label>
               <input
@@ -65,22 +49,7 @@ const SignupPage = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="your@email.com"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="age">Age</label>
-              <input
-                type="number"
-                id="age"
-                name="age"
-                value={formData.age}
-                onChange={handleChange}
-                placeholder="25"
-                min="18"
-                max="100"
+                placeholder="johndoe@gmail.com"
                 required
               />
             </div>
@@ -98,14 +67,18 @@ const SignupPage = () => {
               />
             </div>
 
+            <p className="auth-terms">
+              By signing up you agree to our <a href="#">terms and conditions</a> and <a href="#">privacy policy</a>.
+            </p>
+
             <button type="submit" className="auth-submit">
               Sign Up
             </button>
           </form>
 
-          <p className="auth-footer">
-            Already have an account? <Link to="/login">Login</Link>
-          </p>
+          <Link to="/login" className="auth-secondary-btn">
+            I already have an account
+          </Link>
         </div>
       </div>
     </div>
