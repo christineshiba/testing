@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import './Header.css';
 
 const Header = () => {
-  const { isAuthenticated, currentUser, logout } = useApp();
+  const { isAuthenticated, logout } = useApp();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -22,7 +22,7 @@ const Header = () => {
           {isAuthenticated ? (
             <>
               <Link to="/invite" className="nav-link">
-                🎁 Invite friends
+                <span className="nav-icon">🎁</span> Invite friends
               </Link>
               <Link to="/directory" className="nav-link">
                 Directory
@@ -34,20 +34,14 @@ const Header = () => {
                 Matches
                 <span className="notification-dot"></span>
               </Link>
-              <Link to="/premium" className="nav-link">
-                Premium
-              </Link>
-              <button onClick={handleLogout} className="nav-link">
+                            <button onClick={handleLogout} className="nav-link">
                 Log out
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="nav-link">
-                Login
-              </Link>
-              <Link to="/signup" className="nav-link">
-                Sign Up
+              <Link to="/signup" className="nav-link signup-btn">
+                Sign up
               </Link>
             </>
           )}
