@@ -213,6 +213,12 @@ const CommunityPage = () => {
                     <p>{[user.age, user.gender, user.location].filter(Boolean).join(' \u2022 ')}</p>
                   </div>
 
+                  {user.communities && user.communities.length > 0 && (
+                    <div className="member-communities">
+                      {user.communities.slice(0, 2).join(', ')}
+                    </div>
+                  )}
+
                   {/* Voucher avatars */}
                   {userVouchers[user.id] && userVouchers[user.id].length > 0 && (
                     <div className="member-vouchers">

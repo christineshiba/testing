@@ -1,15 +1,30 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { fetchVouchersForUsers } from '../lib/supabase';
+import { MagnifyingGlass, X, Sliders } from '@phosphor-icons/react';
 import './DirectoryPage.css';
 
 const COMMUNITIES = [
-  'Crypto', 'Farcaster', 'Fractal', 'FuturePARTS', 'Outdoor climbing',
-  'SF Commons', 'Solarpunk', 'Vibecamp', 'Vitapets', 'Megavn'
+  'Tpot', 'Vibecamp', 'Fractal', 'SF Commons', 'Crypto', 'Farcaster',
+  'Outdoor climbing', 'Solarpunk', 'FuturePARTS', 'Interintellect'
 ];
 
+// Calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 const DirectoryPage = () => {
-  const { users, isAuthenticated, currentUser } = useApp();
+  const { users, isAuthenticated, currentUser, usersLoading, hasMore, loadMoreUsers, searchUsers, refreshUsers, loading } = useApp();
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [filters, setFilters] = useState({
@@ -17,6 +32,7 @@ const DirectoryPage = () => {
     community: '',
     interests: '',
     location: '',
+    locationRadius: 25,
     gender: '',
     hereFor: '',
     ageMin: 18,
@@ -28,7 +44,151 @@ const DirectoryPage = () => {
   });
   const [showAgeSlider, setShowAgeSlider] = useState(false);
   const [ageFilterActive, setAgeFilterActive] = useState(false);
+  const [showLocationFilter, setShowLocationFilter] = useState(false);
+  const [locationFilterActive, setLocationFilterActive] = useState(false);
+  const [tempLocation, setTempLocation] = useState('');
+  const [tempRadius, setTempRadius] = useState(25);
+  const [selectedCoords, setSelectedCoords] = useState(null);
+  const [tempCoords, setTempCoords] = useState(null);
+  const [mapsReady, setMapsReady] = useState(false);
+  const [userCoords, setUserCoords] = useState({});
+  const locationInputRef = useRef(null);
+  const [userVouchers, setUserVouchers] = useState({});
   const navigate = useNavigate();
+  const searchTimeoutRef = useRef(null);
+
+  // Debounced search - triggers API call when user stops typing
+  useEffect(() => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If search is empty, refresh to get default users
+    if (!filters.search) {
+      refreshUsers();
+      return;
+    }
+
+    // Debounce the search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      searchUsers(filters.search);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [filters.search, searchUsers, refreshUsers]);
+
+  // Fetch vouchers for displayed users
+  useEffect(() => {
+    const loadVouchers = async () => {
+      if (users.length === 0) return;
+      const userIds = users.map(u => u.id);
+      if (currentUser) userIds.push(currentUser.id);
+      const vouchers = await fetchVouchersForUsers(userIds);
+      setUserVouchers(vouchers);
+    };
+    loadVouchers();
+  }, [users, currentUser]);
+
+  // Check if Google Maps is ready
+  useEffect(() => {
+    if (window.googleMapsReady) {
+      setMapsReady(true);
+    } else {
+      const handleMapsReady = () => setMapsReady(true);
+      window.addEventListener('google-maps-ready', handleMapsReady);
+      return () => window.removeEventListener('google-maps-ready', handleMapsReady);
+    }
+  }, []);
+
+  // Focus input when location filter opens
+  useEffect(() => {
+    if (showLocationFilter && locationInputRef.current) {
+      locationInputRef.current.value = tempLocation || '';
+      locationInputRef.current.focus();
+    }
+  }, [showLocationFilter]);
+
+  // Geocode user locations for distance filtering
+  const geocodedUsers = useRef(new Set());
+  const geocodingBatch = useRef(null);
+
+  // Clear geocoding cache when location filter changes
+  useEffect(() => {
+    if (!locationFilterActive) {
+      geocodedUsers.current.clear();
+      setUserCoords({});
+    }
+  }, [locationFilterActive]);
+
+  useEffect(() => {
+    if (!locationFilterActive || !selectedCoords || !mapsReady || !window.google?.maps) return;
+
+    const geocoder = new window.google.maps.Geocoder();
+    const usersToGeocode = users.filter(u =>
+      u.location && !geocodedUsers.current.has(u.id)
+    );
+
+    if (usersToGeocode.length === 0) return;
+
+    // Cancel any pending batch
+    if (geocodingBatch.current) {
+      clearTimeout(geocodingBatch.current);
+    }
+
+    // Debounce the geocoding
+    geocodingBatch.current = setTimeout(() => {
+      const results = {};
+      let completed = 0;
+      const batch = usersToGeocode.slice(0, 20);
+
+      // Mark all as being processed
+      batch.forEach(u => geocodedUsers.current.add(u.id));
+
+      batch.forEach((user, index) => {
+        setTimeout(() => {
+          geocoder.geocode({ address: user.location }, (geoResults, status) => {
+            if (status === 'OK' && geoResults[0]) {
+              results[user.id] = {
+                lat: geoResults[0].geometry.location.lat(),
+                lng: geoResults[0].geometry.location.lng(),
+              };
+            } else {
+              results[user.id] = null;
+            }
+
+            completed++;
+
+            // Update state once all in batch are done
+            if (completed === batch.length) {
+              setUserCoords(prev => ({ ...prev, ...results }));
+            }
+          });
+        }, index * 100);
+      });
+    }, 300);
+
+    return () => {
+      if (geocodingBatch.current) {
+        clearTimeout(geocodingBatch.current);
+      }
+    };
+  }, [users, locationFilterActive, selectedCoords, mapsReady]);
+
+  // Wait for session check to complete
+  if (loading) {
+    return (
+      <div className="directory-page">
+        <div className="loading-indicator">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -45,6 +205,7 @@ const DirectoryPage = () => {
       community: '',
       interests: '',
       location: '',
+      locationRadius: 25,
       gender: '',
       hereFor: '',
       ageMin: 18,
@@ -55,22 +216,34 @@ const DirectoryPage = () => {
       kids: '',
     });
     setAgeFilterActive(false);
+    setLocationFilterActive(false);
+    setTempLocation('');
+    setTempRadius(25);
+    setSelectedCoords(null);
+    setTempCoords(null);
   };
 
   const filteredUsers = useMemo(() => {
-    // Include current user in the directory
-    const allUsers = currentUser ? [currentUser, ...users.filter(u => u.id !== currentUser.id)] : users;
-    let result = [...allUsers];
+    // Include current user in the directory (only if not searching)
+    // Use a Map to ensure unique users by ID (handles string/number type mismatches)
+    const userMap = new Map();
 
-    // Search filter
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      result = result.filter(u =>
-        u.name.toLowerCase().includes(search) ||
-        u.bio.toLowerCase().includes(search) ||
-        u.interests?.some(i => i.toLowerCase().includes(search))
-      );
+    // Add current user first if logged in and not searching
+    if (currentUser && !filters.search) {
+      userMap.set(String(currentUser.id), currentUser);
     }
+
+    // Add all other users, ensuring no duplicates
+    users.forEach(u => {
+      const id = String(u.id);
+      if (!userMap.has(id)) {
+        userMap.set(id, u);
+      }
+    });
+
+    let result = Array.from(userMap.values());
+
+    // Note: Search is handled server-side via searchUsers(), not filtered here
 
     // Community filter
     if (filters.community) {
@@ -87,12 +260,36 @@ const DirectoryPage = () => {
       );
     }
 
-    // Location filter
-    if (filters.location) {
-      const location = filters.location.toLowerCase();
-      result = result.filter(u =>
-        u.location.toLowerCase().includes(location)
-      );
+    // Location filter with distance calculation
+    if (locationFilterActive && filters.location) {
+      const searchLocation = filters.location.toLowerCase();
+
+      if (selectedCoords) {
+        // Use distance-based filtering when we have coordinates
+        result = result.filter(u => {
+          // If we have geocoded coords for this user
+          if (userCoords[u.id]) {
+            const distance = calculateDistance(
+              selectedCoords.lat,
+              selectedCoords.lng,
+              userCoords[u.id].lat,
+              userCoords[u.id].lng
+            );
+            return distance <= filters.locationRadius;
+          }
+          // If geocoding failed (null), use text matching
+          if (userCoords[u.id] === null) {
+            return u.location?.toLowerCase().includes(searchLocation);
+          }
+          // If not yet geocoded, include them (will be filtered once geocoded)
+          return u.location?.toLowerCase().includes(searchLocation);
+        });
+      } else {
+        // Text matching fallback when no coordinates
+        result = result.filter(u =>
+          u.location?.toLowerCase().includes(searchLocation)
+        );
+      }
     }
 
     // Gender filter
@@ -139,6 +336,9 @@ const DirectoryPage = () => {
       case 'newest':
         result = result.sort((a, b) => b.id - a.id);
         break;
+      case 'alphabetical':
+        result = result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        break;
       case 'active':
         result = result.sort((a, b) => (b.projects?.length || 0) - (a.projects?.length || 0));
         break;
@@ -150,7 +350,7 @@ const DirectoryPage = () => {
     }
 
     return result;
-  }, [users, currentUser, filters, sortBy, ageFilterActive]);
+  }, [users, currentUser, filters, sortBy, ageFilterActive, locationFilterActive, selectedCoords, userCoords]);
 
   return (
     <div className="directory-page">
@@ -160,8 +360,22 @@ const DirectoryPage = () => {
           Make IRL connections faster. Find the others within your existing community.
         </p>
 
-        {/* Quick Filter Pills */}
-        <div className="filter-pills">
+        {/* Search, Sort, and Filters - All on one line */}
+        <div className="filters-row">
+          <div className="search-bar-container">
+            <MagnifyingGlass className="search-icon" size={20} weight="bold" />
+            <input
+              type="text"
+              placeholder="Search..."
+              className="search-bar"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+            />
+            {filters.search && (
+              <button className="search-clear" onClick={() => handleFilterChange('search', '')}><X size={14} weight="bold" /></button>
+            )}
+          </div>
+
           <select
             className={`filter-pill ${filters.gender ? 'active' : ''}`}
             value={filters.gender}
@@ -173,18 +387,108 @@ const DirectoryPage = () => {
             <option value="They / Them">They / Them</option>
           </select>
 
-          <select
-            className={`filter-pill ${filters.location ? 'active' : ''}`}
-            value={filters.location}
-            onChange={(e) => handleFilterChange('location', e.target.value)}
-          >
-            <option value="">Location</option>
-            <option value="San Francisco">San Francisco</option>
-            <option value="Oakland">Oakland</option>
-            <option value="Berkeley">Berkeley</option>
-            <option value="Palo Alto">Palo Alto</option>
-            <option value="Santa Cruz">Santa Cruz</option>
-          </select>
+          <div className="location-filter-wrapper">
+            <button
+              className={`filter-pill ${locationFilterActive ? 'active' : ''}`}
+              onClick={() => {
+                const opening = !showLocationFilter;
+                setShowLocationFilter(opening);
+                if (opening) {
+                  setTempLocation(filters.location);
+                  setTempRadius(filters.locationRadius);
+                  setTempCoords(selectedCoords);
+                }
+              }}
+            >
+              {locationFilterActive ? `${filters.location} (${filters.locationRadius}mi)` : 'Location'}
+            </button>
+            {showLocationFilter && (
+              <div className="location-filter-dropdown">
+                <div className="location-filter-header">
+                  <span>Location</span>
+                </div>
+                <div className="location-input-group">
+                  <input
+                    ref={locationInputRef}
+                    type="text"
+                    placeholder="Search for a city..."
+                    className="location-input"
+                    autoComplete="off"
+                    onChange={(e) => {
+                      setTempLocation(e.target.value);
+                      setTempCoords(null);
+                    }}
+                  />
+                </div>
+                <div className="radius-slider-section">
+                  <div className="radius-slider-header">
+                    <span>Distance</span>
+                    <span className="radius-value">{tempRadius} miles</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="100"
+                    step="5"
+                    value={tempRadius}
+                    onChange={(e) => setTempRadius(parseInt(e.target.value))}
+                    className="radius-slider"
+                  />
+                  <div className="radius-slider-labels">
+                    <span>5 mi</span>
+                    <span>100 mi</span>
+                  </div>
+                </div>
+                <div className="location-filter-actions">
+                  <button
+                    className="location-clear-btn"
+                    onClick={() => {
+                      setLocationFilterActive(false);
+                      setTempLocation('');
+                      setTempRadius(25);
+                      setTempCoords(null);
+                      setSelectedCoords(null);
+                      handleFilterChange('location', '');
+                      handleFilterChange('locationRadius', 25);
+                      setShowLocationFilter(false);
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    className="location-apply-btn"
+                    onClick={async () => {
+                      const locationValue = tempLocation.trim();
+                      if (locationValue) {
+                        setLocationFilterActive(true);
+                        handleFilterChange('location', locationValue);
+                        handleFilterChange('locationRadius', tempRadius);
+
+                        // Use coords from autocomplete or try to geocode
+                        if (tempCoords) {
+                          setSelectedCoords(tempCoords);
+                        } else if (mapsReady && window.google?.maps) {
+                          // Try to geocode the typed location
+                          const geocoder = new window.google.maps.Geocoder();
+                          geocoder.geocode({ address: locationValue }, (results, status) => {
+                            if (status === 'OK' && results[0]) {
+                              setSelectedCoords({
+                                lat: results[0].geometry.location.lat(),
+                                lng: results[0].geometry.location.lng(),
+                              });
+                            }
+                          });
+                        }
+                      }
+                      setShowLocationFilter(false);
+                    }}
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <select
             className={`filter-pill ${filters.hereFor ? 'active' : ''}`}
@@ -277,15 +581,74 @@ const DirectoryPage = () => {
             className="filter-pill more-filters"
             onClick={() => setShowFilters(true)}
           >
-            More filters
+            <Sliders size={16} /> More filters
           </button>
 
-          {(filters.gender || filters.location || filters.hereFor || ageFilterActive || filters.search || filters.community || filters.interests || filters.sexuality || filters.relationship || filters.nomadic || filters.kids) && (
-            <button className="clear-filters" onClick={resetFilters}>
+          <div className="sort-container">
+            <select
+              className="sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="newest">Recent</option>
+              <option value="alphabetical">A-Z</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Active Filters */}
+        {(filters.gender || locationFilterActive || filters.hereFor || ageFilterActive || filters.search || filters.community || filters.interests) && (
+          <div className="active-filters">
+            {filters.search && (
+              <span className="active-filter-pill">
+                "{filters.search}"
+                <button onClick={() => handleFilterChange('search', '')}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            {filters.gender && (
+              <span className="active-filter-pill">
+                {filters.gender}
+                <button onClick={() => handleFilterChange('gender', '')}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            {locationFilterActive && filters.location && (
+              <span className="active-filter-pill">
+                {filters.location} ({filters.locationRadius}mi)
+                <button onClick={() => {
+                  setLocationFilterActive(false);
+                  handleFilterChange('location', '');
+                }}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            {filters.hereFor && (
+              <span className="active-filter-pill">
+                {filters.hereFor}
+                <button onClick={() => handleFilterChange('hereFor', '')}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            {ageFilterActive && (
+              <span className="active-filter-pill">
+                Age: {filters.ageMin} - {filters.ageMax}
+                <button onClick={() => setAgeFilterActive(false)}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            {filters.community && (
+              <span className="active-filter-pill">
+                {filters.community}
+                <button onClick={() => handleFilterChange('community', '')}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            {filters.interests && (
+              <span className="active-filter-pill">
+                {filters.interests}
+                <button onClick={() => handleFilterChange('interests', '')}><X size={12} weight="bold" /></button>
+              </span>
+            )}
+            <button className="clear-all-filters" onClick={resetFilters}>
               Clear all
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="directory-grid">
           {filteredUsers.map((user) => (
@@ -295,11 +658,25 @@ const DirectoryPage = () => {
               className="directory-card"
             >
               <div className="profile-image">
-                <img src={user.photos[0]} alt={user.name} />
+                <img
+                  src={user.mainPhoto || user.photos?.[0] || 'https://via.placeholder.com/400x400?text=No+Photo'}
+                  alt={user.name}
+                  onError={(e) => {
+                    // Try fallback photos if main photo fails (e.g., HEIC format)
+                    const fallbacks = (user.photos || []).filter(p =>
+                      p && (p.toLowerCase().endsWith('.jpg') || p.toLowerCase().endsWith('.jpeg') || p.toLowerCase().endsWith('.png'))
+                    );
+                    if (fallbacks.length > 0 && e.target.src !== fallbacks[0]) {
+                      e.target.src = fallbacks[0].startsWith('//') ? 'https:' + fallbacks[0] : fallbacks[0];
+                    } else {
+                      e.target.src = 'https://via.placeholder.com/400x400?text=No+Photo';
+                    }
+                  }}
+                />
               </div>
               <div className="profile-content">
                 <h3 className="profile-name">{user.name}</h3>
-                <p className="profile-bio">{user.bio}</p>
+                <p className="profile-bio">{user.quickBio || user.bio}</p>
 
                 <div className="profile-badges">
                   {user.hereFor?.includes('Love') && <span className="badge love">Love</span>}
@@ -308,19 +685,35 @@ const DirectoryPage = () => {
                 </div>
 
                 <div className="profile-meta">
-                  <p>{user.age} • {user.gender} • {user.location}</p>
-                  {user.interests && (
+                  <p>{[user.age, user.gender, user.location].filter(Boolean).join(' • ')}</p>
+                  {user.interests && user.interests.length > 0 && (
                     <p className="profile-interests">
                       {user.interests.slice(0, 3).join(', ')}
                     </p>
                   )}
                 </div>
 
-                {user.communities && (
+                {user.communities && user.communities.length > 0 && (
                   <div className="profile-communities">
-                    {user.communities.slice(0, 2).map((c, idx) => (
-                      <span key={idx} className="community-tag">{c}</span>
+                    {user.communities.slice(0, 2).join(', ')}
+                  </div>
+                )}
+
+                {/* Voucher avatars */}
+                {userVouchers[user.id] && userVouchers[user.id].length > 0 && (
+                  <div className="card-vouchers">
+                    {userVouchers[user.id].slice(0, 4).map((voucher, idx) => (
+                      <img
+                        key={idx}
+                        src={voucher.photo || 'https://via.placeholder.com/28?text=?'}
+                        alt={voucher.name}
+                        className="card-voucher-avatar"
+                        title={`Vouched by ${voucher.name}`}
+                      />
                     ))}
+                    {userVouchers[user.id].length > 4 && (
+                      <span className="card-voucher-more">+{userVouchers[user.id].length - 4}</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -328,7 +721,21 @@ const DirectoryPage = () => {
           ))}
         </div>
 
-        {filteredUsers.length === 0 && (
+        {usersLoading && (
+          <div className="loading-indicator">
+            <p>Loading profiles...</p>
+          </div>
+        )}
+
+        {!usersLoading && hasMore && filteredUsers.length > 0 && (
+          <div className="load-more-container">
+            <button className="load-more-btn" onClick={loadMoreUsers}>
+              Load More
+            </button>
+          </div>
+        )}
+
+        {!usersLoading && filteredUsers.length === 0 && (
           <div className="no-results">
             <p>No profiles match your filters. Try adjusting your search.</p>
             <button onClick={resetFilters}>Reset Filters</button>
@@ -341,7 +748,7 @@ const DirectoryPage = () => {
           <div className="filters-modal" onClick={(e) => e.stopPropagation()}>
             <div className="filters-header">
               <h2>Advanced Filters</h2>
-              <button onClick={() => setShowFilters(false)}>×</button>
+              <button onClick={() => setShowFilters(false)}><X size={20} weight="bold" /></button>
             </div>
 
             <div className="filter-group">

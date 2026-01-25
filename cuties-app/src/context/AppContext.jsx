@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase, fetchUsers, fetchUserById, fetchMutualMatches, fetchMessages, transformUser } from '../lib/supabase';
 
 const AppContext = createContext();
 
@@ -11,323 +12,276 @@ export const useApp = () => {
 };
 
 export const AppProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('currentUser');
-    return saved ? JSON.parse(saved) : {
-      id: 999,
-      name: 'Demo User',
-      age: 25,
-      gender: 'They / Them',
-      location: 'San Francisco, CA',
-      bio: 'Just exploring the app!',
-      quickBio: 'Exploring cuties.app',
-      interests: ['Technology', 'Art', 'Music'],
-      photos: ['https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400'],
-      hereFor: ['Friends', 'Love'],
-      communities: ['Vibecamp'],
-      socials: {},
-    };
-  });
+  const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
-  const [matches, setMatches] = useState(() => {
-    const saved = localStorage.getItem('matches');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('messages');
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [matches, setMatches] = useState([]);
+  const [messages, setMessages] = useState({});
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Persist currentUser to localStorage
+  // Check for existing session on mount
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('currentUser');
-    }
-  }, [currentUser]);
+    const checkSession = async () => {
+      // Check for Supabase Auth session
+      const { data: { session } } = await supabase.auth.getSession();
 
-  // Persist authentication state
-  useEffect(() => {
-    localStorage.setItem('isAuthenticated', isAuthenticated);
-  }, [isAuthenticated]);
+      if (session?.user) {
+        // Find the user profile linked to this auth user
+        let { data: userData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('auth_id', session.user.id)
+          .single();
 
-  // Persist matches
-  useEffect(() => {
-    localStorage.setItem('matches', JSON.stringify(matches));
-  }, [matches]);
+        // If no profile found by auth_id, try by email (for users who haven't been linked yet)
+        if (!userData) {
+          const { data: emailUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', session.user.email)
+            .single();
 
-  // Persist messages
-  useEffect(() => {
-    localStorage.setItem('messages', JSON.stringify(messages));
-  }, [messages]);
+          if (emailUser) {
+            // Link the auth_id
+            await supabase
+              .from('users')
+              .update({ auth_id: session.user.id })
+              .eq('id', emailUser.id);
+            userData = emailUser;
+          }
+        }
 
-  // Initialize with rich mock data
-  useEffect(() => {
-    const mockUsers = [
-      {
-        id: 1,
-        name: 'Alex Chen',
-        age: 26,
-        gender: 'She / Her',
-        location: 'San Francisco, CA',
-        bio: 'Artist & Designer | Coffee enthusiast | Love hiking and exploring the city',
-        quickBio: 'SF creative making things',
-        interests: ['Art', 'Hiking', 'Coffee', 'Design', 'Photography'],
-        photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'],
-        distance: 2,
-        hereFor: ['Love', 'Friends'],
-        communities: ['Crypto', 'Farcaster', 'Vibecamp'],
-        socials: { twitter: 'alexchen', instagram: 'alexchen.art' },
-        spotify: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
-        youtube: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-        tweets: [
-          'https://x.com/sama/status/1745875097498370293',
-          'https://twitter.com/OpenAI/status/1745475054840762408'
-        ],
-        projects: [
-          { title: 'Design Studio', link: 'https://alexchen.design', description: 'Freelance design work' }
-        ],
-        promptQuestion: 'What creative projects are you working on?',
-      },
-      {
-        id: 2,
-        name: 'Jordan Smith',
-        age: 24,
-        gender: 'He / Him',
-        location: 'San Francisco, CA',
-        bio: 'Book lover | Tech geek | Always up for a good conversation',
-        quickBio: 'Building cool things at a startup',
-        interests: ['Reading', 'Technology', 'Gaming', 'Music', 'Startups'],
-        photos: ['https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400'],
-        distance: 3,
-        hereFor: ['Friends', 'Collaboration'],
-        communities: ['Crypto', 'SF Commons', 'Solarpunk'],
-        socials: { twitter: 'jordansmith', instagram: 'jordan.codes' },
-        projects: [
-          { title: 'Open Source CLI', link: 'https://github.com/jordan', description: 'Developer tools' }
-        ],
-        promptQuestion: 'What book changed your perspective?',
-      },
-      {
-        id: 3,
-        name: 'Sam Rodriguez',
-        age: 28,
-        gender: 'She / Her',
-        location: 'Oakland, CA',
-        bio: 'Marathon runner | Foodie | Dog parent to two golden retrievers',
-        quickBio: 'Running and cooking my way through life',
-        interests: ['Running', 'Food', 'Dogs', 'Travel', 'Wellness'],
-        photos: ['https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400'],
-        distance: 5,
-        hereFor: ['Love', 'Friends'],
-        communities: ['Outdoor climbing', 'Vibecamp'],
-        socials: { twitter: 'samruns', instagram: 'sam.and.dogs' },
-        youtube: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
-        promptQuestion: 'Best trail you have ever run?',
-      },
-      {
-        id: 4,
-        name: 'Taylor Kim',
-        age: 25,
-        gender: 'They / Them',
-        location: 'Berkeley, CA',
-        bio: 'Musician | Plant parent | Looking for concert buddies',
-        quickBio: 'Making music and growing plants',
-        interests: ['Music', 'Plants', 'Concerts', 'Cooking', 'Meditation'],
-        photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'],
-        distance: 4,
-        hereFor: ['Friends', 'Collaboration'],
-        communities: ['Fractal', 'Solarpunk', 'Vibecamp'],
-        socials: { twitter: 'taylorkim', instagram: 'taylor.tunes' },
-        spotify: 'https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b',
-        projects: [
-          { title: 'Ambient Album', link: 'https://spotify.com', description: 'Electronic ambient music' }
-        ],
-        promptQuestion: 'What song is stuck in your head?',
-      },
-      {
-        id: 5,
-        name: 'Casey Johnson',
-        age: 27,
-        gender: 'She / Her',
-        location: 'Santa Cruz, CA',
-        bio: 'Surfer | Yoga instructor | Living for those sunset beach vibes',
-        quickBio: 'Beach life and mindfulness',
-        interests: ['Surfing', 'Yoga', 'Beach', 'Photography', 'Wellness'],
-        photos: ['https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400'],
-        distance: 8,
-        hereFor: ['Love'],
-        communities: ['Outdoor climbing', 'Vibecamp'],
-        socials: { twitter: 'caseysurf', instagram: 'casey.waves' },
-        promptQuestion: 'Sunrise or sunset surf session?',
-      },
-      {
-        id: 6,
-        name: 'Nathan Park',
-        age: 30,
-        gender: 'He / Him',
-        location: 'San Francisco, CA',
-        bio: 'I really want to fall deeply in love with everyone, but I also want to fight everyone.',
-        quickBio: 'Philosopher and woodworker',
-        interests: ['Philosophy', 'Meditation', 'Woodworking', 'Zen', 'Martial Arts'],
-        photos: ['https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400'],
-        distance: 2,
-        hereFor: ['Love', 'Friends', 'Collaboration'],
-        communities: ['Fractal', 'SF Commons', 'Megavn'],
-        socials: { twitter: 'nathanpark', instagram: 'nathan.crafts' },
-        projects: [
-          { title: 'Handmade Furniture', link: 'https://nathanpark.com', description: 'Custom woodworking' }
-        ],
-        promptQuestion: 'What paradox do you live with?',
-      },
-      {
-        id: 7,
-        name: 'Jose Luis Ricon',
-        age: 32,
-        gender: 'He / Him',
-        location: 'San Francisco, CA',
-        bio: 'A local SF character that works in biotech and hangs out at House of Prime Rib.',
-        quickBio: 'Biotech researcher and foodie',
-        interests: ['Biotech', 'Flamenco', 'Dancing', 'Fitness', 'Science'],
-        photos: ['https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400'],
-        distance: 3,
-        hereFor: ['Friends', 'Collaboration'],
-        communities: ['Crypto', 'FuturePARTS', 'SF Commons'],
-        socials: { twitter: 'jose_a_ricon', instagram: 'joseluis.sf' },
-        projects: [
-          { title: 'Longevity Research', link: 'https://nintil.com', description: 'Writing about science and progress' }
-        ],
-        promptQuestion: 'What scientific breakthrough excites you most?',
-      },
-      {
-        id: 8,
-        name: 'Maya Patel',
-        age: 29,
-        gender: 'She / Her',
-        location: 'Palo Alto, CA',
-        bio: 'AI researcher by day, salsa dancer by night. Building the future while staying grounded.',
-        quickBio: 'AI + dance + good vibes',
-        interests: ['AI', 'Dancing', 'Research', 'Startups', 'Travel'],
-        photos: ['https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400'],
-        distance: 6,
-        hereFor: ['Love', 'Collaboration'],
-        communities: ['Crypto', 'FuturePARTS', 'Vibecamp'],
-        socials: { twitter: 'mayapatel_ai', instagram: 'maya.dances' },
-        spotify: 'https://open.spotify.com/playlist/example',
-        projects: [
-          { title: 'AI Safety Research', link: 'https://mayapatel.ai', description: 'Working on alignment' }
-        ],
-        promptQuestion: 'How do you balance ambition with presence?',
-      },
-      {
-        id: 9,
-        name: 'River Chen',
-        age: 31,
-        gender: 'They / Them',
-        location: 'Oakland, CA',
-        bio: 'Community organizer | Urban farmer | Believe in the power of local food systems',
-        quickBio: 'Growing food and community',
-        interests: ['Farming', 'Community', 'Sustainability', 'Cooking', 'Education'],
-        photos: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400'],
-        distance: 5,
-        hereFor: ['Friends', 'Collaboration'],
-        communities: ['Solarpunk', 'SF Commons', 'Fractal'],
-        socials: { twitter: 'riverchen', instagram: 'river.grows' },
-        projects: [
-          { title: 'Oakland Urban Farm', link: 'https://oaklandfarm.org', description: 'Community supported agriculture' }
-        ],
-        promptQuestion: 'What does community mean to you?',
-      },
-      {
-        id: 10,
-        name: 'Zoe Williams',
-        age: 26,
-        gender: 'She / Her',
-        location: 'San Francisco, CA',
-        bio: 'Writer and podcast host exploring the intersection of tech and humanity',
-        quickBio: 'Telling stories that matter',
-        interests: ['Writing', 'Podcasting', 'Technology', 'Philosophy', 'Interviews'],
-        photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400'],
-        distance: 1,
-        hereFor: ['Friends', 'Collaboration'],
-        communities: ['Farcaster', 'Vibecamp', 'SF Commons'],
-        socials: { twitter: 'zoewrites', instagram: 'zoe.stories' },
-        youtube: 'https://youtube.com/zoepodcast',
-        projects: [
-          { title: 'Human Tech Podcast', link: 'https://humantech.fm', description: 'Weekly conversations' }
-        ],
-        promptQuestion: 'What story do you want to tell?',
-      },
-    ];
-    setUsers(mockUsers);
+        if (userData) {
+          setCurrentUser(transformUser(userData));
+          setIsAuthenticated(true);
+        }
+      }
+      setLoading(false);
+    };
+
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Small delay to let the callback page handle profile creation
+        setTimeout(async () => {
+          let { data: userData } = await supabase
+            .from('users')
+            .select('*')
+            .eq('auth_id', session.user.id)
+            .single();
+
+          if (!userData) {
+            const { data: emailUser } = await supabase
+              .from('users')
+              .select('*')
+              .eq('email', session.user.email)
+              .single();
+            userData = emailUser;
+          }
+
+          if (userData) {
+            setCurrentUser(transformUser(userData));
+            setIsAuthenticated(true);
+          }
+        }, 500);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setMatches([]);
+        setMessages({});
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = (user) => {
-    setCurrentUser(user);
-    setIsAuthenticated(true);
+  // Load initial users
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  // Load users from Supabase
+  const loadUsers = useCallback(async (reset = false) => {
+    if (usersLoading) return;
+
+    setUsersLoading(true);
+    const newPage = reset ? 0 : page;
+
+    try {
+      const newUsers = await fetchUsers({ page: newPage, limit: 20 });
+
+      if (reset) {
+        setUsers(newUsers);
+        setPage(1);
+      } else {
+        setUsers(prev => [...prev, ...newUsers]);
+        setPage(prev => prev + 1);
+      }
+
+      setHasMore(newUsers.length === 20);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [page, usersLoading]);
+
+  // Search users
+  const searchUsers = useCallback(async (searchTerm) => {
+    setUsersLoading(true);
+    try {
+      const results = await fetchUsers({ page: 0, limit: 50, search: searchTerm });
+      setUsers(results);
+      setHasMore(false);
+    } catch (error) {
+      console.error('Error searching users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  // Send magic link for login
+  const sendMagicLink = async (email) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + '/auth/callback',
+      },
+    });
+
+    if (error) {
+      console.error('Magic link error:', error);
+      return false;
+    }
+
+    return true;
   };
 
-  const logout = () => {
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setIsAuthenticated(false);
     setMatches([]);
     setMessages({});
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('matches');
-    localStorage.removeItem('messages');
+    localStorage.removeItem('currentUserId');
   };
 
-  const updateUser = (updates) => {
+  const updateUser = async (updates) => {
+    if (!currentUser) return;
+
+    // Update local state immediately
     setCurrentUser(prev => ({ ...prev, ...updates }));
-  };
 
-  const addMatch = (userId) => {
-    if (!matches.includes(userId)) {
-      setMatches([...matches, userId]);
-      setMessages(prev => ({
-        ...prev,
-        [userId]: []
-      }));
+    // Update in database
+    const { error } = await supabase
+      .from('users')
+      .update({
+        name: updates.name,
+        short_description: updates.quickBio,
+        long_description: updates.bio,
+        location: updates.location,
+        // Add more fields as needed
+      })
+      .eq('id', currentUser.id);
+
+    if (error) {
+      console.error('Error updating user:', error);
     }
   };
 
-  const sendMessage = (userId, message) => {
+  // Like a user
+  const likeUser = async (userId) => {
+    if (!currentUser) return false;
+
+    const { error } = await supabase
+      .from('likes')
+      .insert({
+        sender_id: currentUser.id,
+        receiver_id: userId,
+      });
+
+    if (error) {
+      console.error('Error liking user:', error);
+      return false;
+    }
+
+    // Check if it's a mutual match
+    const { data: mutualCheck } = await supabase
+      .from('likes')
+      .select('*')
+      .eq('sender_id', userId)
+      .eq('receiver_id', currentUser.id)
+      .single();
+
+    if (mutualCheck) {
+      // It's a match! Reload matches
+      const userMatches = await fetchMutualMatches(currentUser.id);
+      setMatches(userMatches);
+      return 'match';
+    }
+
+    return true;
+  };
+
+  // Send a message
+  const sendMessage = async (recipientId, messageText) => {
+    if (!currentUser) return;
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: currentUser.id,
+        recipient_id: recipientId,
+        content: messageText,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error sending message:', error);
+      return;
+    }
+
+    // Update local messages state
     const newMessage = {
-      id: Date.now(),
-      text: message,
+      id: data.id,
+      text: messageText,
       sender: 'me',
-      timestamp: new Date(),
+      timestamp: new Date(data.created_at),
     };
 
     setMessages(prev => ({
       ...prev,
-      [userId]: [...(prev[userId] || []), newMessage]
+      [recipientId]: [...(prev[recipientId] || []), newMessage],
     }));
-
-    setTimeout(() => {
-      const responses = [
-        "That sounds great!",
-        "I'd love to chat more about that!",
-        "When are you free to meet up?",
-        "That's so cool!",
-        "Tell me more!",
-      ];
-      const response = {
-        id: Date.now(),
-        text: responses[Math.floor(Math.random() * responses.length)],
-        sender: 'them',
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => ({
-        ...prev,
-        [userId]: [...(prev[userId] || []), response]
-      }));
-    }, 1000 + Math.random() * 1000);
   };
+
+  // Load messages for a conversation
+  const loadMessages = async (otherUserId) => {
+    if (!currentUser) return;
+
+    const msgs = await fetchMessages(currentUser.id, otherUserId);
+    setMessages(prev => ({
+      ...prev,
+      [otherUserId]: msgs,
+    }));
+  };
+
+  // Get user by ID
+  const getUserById = useCallback(async (id) => {
+    // First check local cache
+    const cached = users.find(u => u.id === id);
+    if (cached) return cached;
+
+    // Fetch from database
+    return await fetchUserById(id);
+  }, [users]);
 
   const value = {
     currentUser,
@@ -335,13 +289,20 @@ export const AppProvider = ({ children }) => {
     matches,
     messages,
     isAuthenticated,
-    login,
+    loading,
+    usersLoading,
+    hasMore,
+    sendMagicLink,
     logout,
     updateUser,
-    addMatch,
+    likeUser,
     sendMessage,
-    getMatchedUsers: () => users.filter(u => matches.includes(u.id)),
-    getUserById: (id) => users.find(u => u.id === parseInt(id)),
+    loadMessages,
+    loadMoreUsers: () => loadUsers(false),
+    searchUsers,
+    refreshUsers: () => loadUsers(true),
+    getMatchedUsers: () => matches,
+    getUserById,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

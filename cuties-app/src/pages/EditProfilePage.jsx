@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import {
+  Heart, UsersThree, Handshake, XLogo, InstagramLogo, Article, YoutubeLogo,
+  CaretDown, Trash, X, ArrowDown
+} from '@phosphor-icons/react';
 import './EditProfilePage.css';
 
 const COMMUNITIES = [
@@ -9,18 +13,18 @@ const COMMUNITIES = [
 ];
 
 const HERE_FOR_OPTIONS = [
-  { id: 'love', label: 'Love', icon: '❤️' },
-  { id: 'friends', label: 'Friends', icon: '👥' },
-  { id: 'collaboration', label: 'Collaboration', icon: '🤝' }
+  { id: 'love', label: 'Love', Icon: Heart },
+  { id: 'friends', label: 'Friends', Icon: UsersThree },
+  { id: 'collaboration', label: 'Collaboration', Icon: Handshake }
 ];
 
 const EditProfilePage = () => {
-  const { currentUser, isAuthenticated, updateUser, logout } = useApp();
+  const { currentUser, isAuthenticated, updateUser, logout, loading } = useApp();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
-    hereFor: currentUser?.hereFor || ['Friends'],
+    hereFor: currentUser?.hereFor || [],
     quickBio: currentUser?.quickBio || currentUser?.bio || '',
     age: currentUser?.age || '',
     gender: currentUser?.gender || 'She / Her',
@@ -31,7 +35,7 @@ const EditProfilePage = () => {
     youtubeChannel: currentUser?.socials?.youtube || '',
     hobbies: currentUser?.interests?.join(', ') || '',
     communities: currentUser?.communities || [],
-    mainPhoto: currentUser?.photos?.[0] || '',
+    mainPhoto: currentUser?.mainPhoto || currentUser?.photos?.[0] || '',
     height: currentUser?.height || '',
     tweets: currentUser?.tweets || ['', '', ''],
     spotify: currentUser?.spotify || '',
@@ -46,6 +50,17 @@ const EditProfilePage = () => {
   const [expandedSections, setExpandedSections] = useState({
     additional: true, aboutMe: true, projects: true, morePhotos: true, freeform: true, settings: true
   });
+
+  // Wait for session check to complete
+  if (loading) {
+    return (
+      <div className="edit-profile-page">
+        <div className="edit-container">
+          <p style={{ textAlign: 'center', padding: '3rem' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated || !currentUser) {
     navigate('/login');
@@ -202,7 +217,7 @@ const EditProfilePage = () => {
                   className={`here-for-btn ${formData.hereFor.includes(opt.label) ? 'active' : ''} ${opt.id}`}
                   onClick={() => toggleHereFor(opt.label)}
                 >
-                  {opt.icon} {opt.label}
+                  <opt.Icon size={16} weight={formData.hereFor.includes(opt.label) ? 'fill' : 'regular'} /> {opt.label}
                 </button>
               ))}
             </div>
@@ -264,7 +279,7 @@ const EditProfilePage = () => {
           <div className="field-group">
             <label className="field-label">Socials</label>
             <div className="social-input-row">
-              <span className="social-icon">𝕏</span>
+              <XLogo size={18} className="social-icon" />
               <input
                 type="text"
                 name="twitter"
@@ -275,7 +290,7 @@ const EditProfilePage = () => {
               />
             </div>
             <div className="social-input-row">
-              <span className="social-icon">📷</span>
+              <InstagramLogo size={18} className="social-icon" />
               <input
                 type="text"
                 name="instagram"
@@ -286,7 +301,7 @@ const EditProfilePage = () => {
               />
             </div>
             <div className="social-input-row">
-              <span className="social-icon">📝</span>
+              <Article size={18} className="social-icon" />
               <input
                 type="text"
                 name="substack"
@@ -297,7 +312,7 @@ const EditProfilePage = () => {
               />
             </div>
             <div className="social-input-row">
-              <span className="social-icon">▶️</span>
+              <YoutubeLogo size={18} className="social-icon" />
               <input
                 type="text"
                 name="youtubeChannel"
@@ -373,14 +388,14 @@ const EditProfilePage = () => {
 
         {/* Optional Divider */}
         <div className="optional-divider">
-          Everything below this point is optional 👇
+          Everything below this point is optional <ArrowDown size={16} />
         </div>
 
         {/* Additional Information */}
         <div className="form-card collapsible">
           <div className="section-header" onClick={() => toggleSection('additional')}>
             <h2 className="section-title">Additional information</h2>
-            <span className={`chevron ${expandedSections.additional ? 'up' : ''}`}>▼</span>
+            <CaretDown size={18} className={`chevron ${expandedSections.additional ? 'up' : ''}`} />
           </div>
           {expandedSections.additional && (
             <div className="section-body">
@@ -405,7 +420,7 @@ const EditProfilePage = () => {
         <div className="form-card collapsible">
           <div className="section-header" onClick={() => toggleSection('aboutMe')}>
             <h2 className="section-title">About me</h2>
-            <span className={`chevron ${expandedSections.aboutMe ? 'up' : ''}`}>▼</span>
+            <CaretDown size={18} className={`chevron ${expandedSections.aboutMe ? 'up' : ''}`} />
           </div>
           {expandedSections.aboutMe && (
             <div className="section-body">
@@ -452,7 +467,7 @@ const EditProfilePage = () => {
         <div className="form-card collapsible">
           <div className="section-header" onClick={() => toggleSection('projects')}>
             <h2 className="section-title">My Projects</h2>
-            <span className={`chevron ${expandedSections.projects ? 'up' : ''}`}>▼</span>
+            <CaretDown size={18} className={`chevron ${expandedSections.projects ? 'up' : ''}`} />
           </div>
           {expandedSections.projects && (
             <div className="section-body">
@@ -488,7 +503,7 @@ const EditProfilePage = () => {
                         rows="2"
                       />
                       <button type="button" className="delete-btn" onClick={() => deleteProject(idx)}>
-                        🗑 Delete
+                        <Trash size={16} /> Delete
                       </button>
                     </div>
                   </div>
@@ -503,7 +518,7 @@ const EditProfilePage = () => {
         <div className="form-card collapsible">
           <div className="section-header" onClick={() => toggleSection('morePhotos')}>
             <h2 className="section-title">More photos</h2>
-            <span className={`chevron ${expandedSections.morePhotos ? 'up' : ''}`}>▼</span>
+            <CaretDown size={18} className={`chevron ${expandedSections.morePhotos ? 'up' : ''}`} />
           </div>
           {expandedSections.morePhotos && (
             <div className="section-body">
@@ -518,7 +533,7 @@ const EditProfilePage = () => {
                           className="remove-photo-btn"
                           onClick={() => removeMorePhoto(idx)}
                         >
-                          ×
+                          <X size={16} weight="bold" />
                         </button>
                       </div>
                     ) : (
@@ -543,7 +558,7 @@ const EditProfilePage = () => {
         <div className="form-card collapsible">
           <div className="section-header" onClick={() => toggleSection('freeform')}>
             <h2 className="section-title">Freeform description</h2>
-            <span className={`chevron ${expandedSections.freeform ? 'up' : ''}`}>▼</span>
+            <CaretDown size={18} className={`chevron ${expandedSections.freeform ? 'up' : ''}`} />
           </div>
           {expandedSections.freeform && (
             <div className="section-body">
@@ -563,7 +578,7 @@ const EditProfilePage = () => {
         <div className="form-card collapsible">
           <div className="section-header" onClick={() => toggleSection('settings')}>
             <h2 className="section-title">Profile settings</h2>
-            <span className={`chevron ${expandedSections.settings ? 'up' : ''}`}>▼</span>
+            <CaretDown size={18} className={`chevron ${expandedSections.settings ? 'up' : ''}`} />
           </div>
           {expandedSections.settings && (
             <div className="section-body">

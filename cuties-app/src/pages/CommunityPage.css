@@ -219,6 +219,13 @@
   color: var(--text-secondary);
 }
 
+.member-communities {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
 .member-vouchers {
   display: flex;
   align-items: center;

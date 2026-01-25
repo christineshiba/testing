@@ -176,6 +176,7 @@
   display: flex;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -212,20 +213,105 @@
   border-color: #d63b5c;
 }
 
+.message-btn {
+  text-decoration: none;
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.message-btn:hover {
+  background: #5a6fd6;
+  border-color: #5a6fd6;
+}
+
 /* Avatar Row */
-.avatar-row {
+/* Vouchers Section */
+.vouchers-section {
   display: flex;
-  gap: 0.35rem;
-  margin-bottom: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
+}
+
+.vouchers-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.voucher-avatars {
+  display: flex;
+  align-items: center;
 }
 
 .avatar-small {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid white;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-left: -8px;
+  transition: transform 0.2s;
+}
+
+.avatar-small:first-child {
+  margin-left: 0;
+}
+
+.vouchers-row:hover .avatar-small {
+  transform: translateY(-2px);
+}
+
+.more-vouchers {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #666;
+  margin-left: -8px;
+  border: 2px solid white;
+}
+
+.vouchers-label {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.vouchers-label.no-vouchers {
+  color: #999;
+}
+
+.vouch-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.vouch-btn:hover {
+  border-color: #1a1a2e;
+  background: #f8f8f8;
+}
+
+.vouch-btn.vouched {
+  background: #e8f5e9;
+  border-color: #4caf50;
+  color: #2e7d32;
 }
 
 /* Interaction Options */
@@ -641,6 +727,26 @@
 
 .review-actions button:hover {
   color: #3b5bdb;
+}
+
+.review-author {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.review-author-photo {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.review-author-name {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
 }
 
 /* Footer */

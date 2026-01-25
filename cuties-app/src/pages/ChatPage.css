@@ -40,6 +40,45 @@
   align-items: center;
   gap: 1rem;
   flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+
+.chat-user-details h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #1a1a1a;
+}
+
+.chat-user-details p {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.chat-group-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  cursor: pointer;
+}
+
+.group-avatar-header {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.loading-text {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
 }
 
 .chat-avatar {
@@ -92,6 +131,24 @@
 
 .message-received {
   justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+.message-sender {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #764ba2;
+  margin-bottom: 0.25rem;
 }
 
 .message-content {
@@ -121,6 +178,19 @@
 .message-time {
   font-size: 0.75rem;
   opacity: 0.7;
+}
+
+.date-separator {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.date-separator span {
+  background: #f0f0f0;
+  padding: 0.35rem 1rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: #666;
 }
 
 .chat-input-form {
@@ -167,6 +237,16 @@
   transform: translateY(0);
 }
 
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.chat-input:disabled {
+  opacity: 0.7;
+}
+
 .user-not-found {
   text-align: center;
   padding: 4rem 2rem;
@@ -193,6 +273,150 @@
   }
 }
 
+/* Participants Panel */
+.participants-panel {
+  background: #f9f7f9;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 1rem 1.5rem;
+}
+
+.participants-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.participants-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #1a1a2e;
+}
+
+.add-member-btn {
+  background: none;
+  border: 1px solid #1a1a2e;
+  color: #1a1a2e;
+  padding: 0.35rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-member-btn:hover {
+  background: #1a1a2e;
+  color: white;
+}
+
+.add-member-section {
+  margin-bottom: 1rem;
+}
+
+.add-member-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.add-member-input:focus {
+  outline: none;
+  border-color: #1a1a2e;
+}
+
+.add-member-results {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.add-member-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.add-member-item:hover {
+  background: #f0f0f0;
+}
+
+.add-member-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.participants-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.participant-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.35rem 0.75rem 0.35rem 0.35rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s;
+}
+
+.participant-item:hover {
+  background: #f0f0f0;
+}
+
+.participant-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.creator-badge {
+  background: #e8e4f0;
+  color: #764ba2;
+  font-size: 0.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: 0.25rem;
+}
+
+.leave-group-btn {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: none;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.leave-group-btn:hover {
+  background: #dc3545;
+  color: white;
+}
+
 @media (max-width: 768px) {
   .chat-container {
     height: calc(100vh - 60px);
@@ -204,5 +428,9 @@
 
   .message-content {
     max-width: 85%;
+  }
+
+  .participants-panel {
+    padding: 0.75rem 1rem;
   }
 }

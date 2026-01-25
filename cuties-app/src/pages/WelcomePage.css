@@ -1,0 +1,219 @@
+.welcome-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5eff5 0%, #ffe6f0 50%, #f0e6ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-container {
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+}
+
+/* Sparkle Decorations */
+.welcome-sparkles {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.sparkle {
+  position: absolute;
+  color: #ff6b9d;
+  animation: sparkle-float 3s ease-in-out infinite;
+}
+
+.sparkle-1 {
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.sparkle-2 {
+  left: 50%;
+  animation-delay: 0.5s;
+  color: #9d6bff;
+}
+
+.sparkle-3 {
+  right: 15%;
+  animation-delay: 1s;
+  color: #ffb36b;
+}
+
+@keyframes sparkle-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-10px) rotate(15deg);
+    opacity: 1;
+  }
+}
+
+/* Welcome Card */
+.welcome-card {
+  background: white;
+  border-radius: 24px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.welcome-icon {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #ffe6f0 0%, #f0e6ff 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  color: #1a1a2e;
+}
+
+.welcome-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 1rem 0;
+}
+
+.welcome-invite-text {
+  font-size: 1rem;
+  color: #666;
+  margin: 0 0 1.5rem 0;
+  line-height: 1.5;
+}
+
+.welcome-invite-text strong {
+  color: #1a1a2e;
+}
+
+.welcome-description {
+  background: #f8f5f8;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.welcome-description p {
+  font-size: 0.9rem;
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Features List */
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  text-align: left;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.feature-icon {
+  width: 28px;
+  height: 28px;
+  background: #1a1a2e;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* CTA Button */
+.welcome-cta {
+  display: block;
+  width: 100%;
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4e 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(26, 26, 46, 0.2);
+}
+
+.welcome-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(26, 26, 46, 0.3);
+}
+
+.welcome-login-link {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 1rem 0 0 0;
+}
+
+.welcome-login-link a {
+  color: #1a1a2e;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.welcome-login-link a:hover {
+  text-decoration: underline;
+}
+
+/* Footer */
+.welcome-footer {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.welcome-footer p {
+  font-size: 0.8rem;
+  color: #888;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .welcome-page {
+    padding: 1rem;
+  }
+
+  .welcome-card {
+    padding: 2rem 1.5rem;
+    border-radius: 20px;
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+  }
+
+  .welcome-icon {
+    width: 70px;
+    height: 70px;
+  }
+
+  .welcome-icon svg {
+    width: 40px;
+    height: 40px;
+  }
+}

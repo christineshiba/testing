@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { Gift } from '@phosphor-icons/react';
 import './Header.css';
 
 const Header = () => {
@@ -22,7 +23,7 @@ const Header = () => {
           {isAuthenticated ? (
             <>
               <Link to="/invite" className="nav-link">
-                <span className="nav-icon">🎁</span> Invite friends
+                <Gift size={16} weight="fill" className="nav-icon" /> Invite friends
               </Link>
               <Link to="/directory" className="nav-link">
                 Directory
@@ -32,9 +33,11 @@ const Header = () => {
               </Link>
               <Link to="/matches" className="nav-link">
                 Matches
-                <span className="notification-dot"></span>
               </Link>
-                            <button onClick={handleLogout} className="nav-link">
+              <Link to="/messages" className="nav-link">
+                Messages
+              </Link>
+              <button onClick={handleLogout} className="nav-link">
                 Log out
               </button>
             </>
