@@ -26,18 +26,20 @@
 
 .browse-button {
   display: inline-block;
-  padding: 0.75rem 2.5rem;
+  padding: 1rem 3rem;
+  background: var(--navy);
   border: 2px solid var(--navy);
-  border-radius: 25px;
-  color: var(--navy);
+  border-radius: 50px;
+  color: white;
   font-weight: 500;
+  font-size: 1.1rem;
   text-decoration: none;
   transition: all 0.2s;
 }
 
 .browse-button:hover {
-  background: var(--navy);
-  color: white;
+  background: var(--navy-dark);
+  border-color: var(--navy-dark);
 }
 
 /* Social Proof Section */
@@ -101,19 +103,25 @@
 
 .community-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 25px;
   padding: 1.25rem;
-  border-left: 4px solid;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 2px solid var(--navy);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, background 0.2s;
   position: relative;
   overflow: hidden;
 }
 
 .community-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  background: var(--navy);
+  color: white;
+}
+
+.community-card:hover .community-name,
+.community-card:hover .community-description,
+.community-card:hover .community-member-count {
+  color: white;
 }
 
 .community-card-content {
@@ -146,13 +154,7 @@
 }
 
 .community-accent {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 60px;
-  height: 60px;
-  opacity: 0.08;
-  border-radius: 0 12px 0 60px;
+  display: none;
 }
 
 .testimonials {

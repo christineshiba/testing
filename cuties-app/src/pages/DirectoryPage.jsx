@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { fetchVouchersForUsers } from '../lib/supabase';
+import { initPlacesAutocomplete } from '../lib/geo';
 import { MagnifyingGlass, X, Sliders } from '@phosphor-icons/react';
 import './DirectoryPage.css';
 
@@ -105,13 +106,27 @@ const DirectoryPage = () => {
     }
   }, []);
 
-  // Focus input when location filter opens
+  // Track autocomplete instance
+  const autocompleteRef = useRef(null);
+
+  // Initialize Places Autocomplete when location filter opens
   useEffect(() => {
-    if (showLocationFilter && locationInputRef.current) {
+    if (showLocationFilter && locationInputRef.current && mapsReady) {
       locationInputRef.current.value = tempLocation || '';
       locationInputRef.current.focus();
+
+      // Initialize autocomplete if not already done
+      if (!autocompleteRef.current) {
+        autocompleteRef.current = initPlacesAutocomplete(
+          locationInputRef.current,
+          (place) => {
+            setTempLocation(place.formattedAddress || place.name);
+            setTempCoords({ lat: place.lat, lng: place.lng });
+          }
+        );
+      }
     }
-  }, [showLocationFilter]);
+  }, [showLocationFilter, mapsReady]);
 
   // Geocode user locations for distance filtering
   const geocodedUsers = useRef(new Set());

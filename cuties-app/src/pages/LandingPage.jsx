@@ -1,9 +1,71 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { communities } from '../data/communities';
 import { fetchCommunityMemberCounts, fetchSampleUserAvatars, fetchTotalUserCount } from '../lib/supabase';
 import './LandingPage.css';
+
+// Helper to create slug from community name
+const toSlug = (name) => name.toLowerCase().replace(/\s+/g, '-');
+
+// Community descriptions - comprehensive list
+const communityDescriptions = {
+  'Tpot': 'Twitter philosophers and deep thinkers exploring ideas together',
+  'Vibecamp': 'Festival community bringing online connections to real life',
+  'Fractal': 'Builders and makers creating the future together',
+  'SF Commons': 'San Francisco community space for curious minds',
+  'Crypto': 'Web3 builders, traders, and decentralization enthusiasts',
+  'Farcaster': 'Decentralized social network community',
+  'Outdoor climbing': 'Rock climbers and outdoor adventure seekers',
+  'Solarpunk': 'Optimistic futurists building sustainable communities',
+  'FuturePARTS': 'Creative technologists exploring art and technology',
+  'Interintellect': 'Global community hosting salons and intellectual discussions',
+  'Feytopia': 'Whimsical community exploring creativity and play',
+  'Edge Esmeralda': 'Experimental pop-up city and community builders',
+  'Zuzalu': 'Pop-up city community exploring new ways of living',
+  'Network State': 'Building digital-first communities and governance',
+  'Effective Altruism': 'Doing the most good through evidence and reason',
+  'Rationalist': 'Truth-seekers applying rigorous thinking to life',
+  'Tech': 'Builders, founders, and technologists shaping the future',
+  'AI': 'Exploring artificial intelligence and its implications',
+  'Brooklyn': 'Creative community in NYC\'s most vibrant borough',
+  'LA': 'Los Angeles creatives, founders, and dreamers',
+  'Austin': 'Texas tech and creative community',
+  'Berlin': 'European hub for artists, techies, and free spirits',
+  'London': 'UK community of builders and thinkers',
+  'NYC': 'New York City\'s community of ambitious builders',
+  'SF': 'San Francisco Bay Area tech and startup community',
+  'Burning Man': 'Burners and radical self-expression enthusiasts',
+  'Lighthaven': 'Rationalist community center and gathering space',
+  'Less Wrong': 'Rationality and AI safety focused community',
+  'EA': 'Effective altruists making the world better',
+  'Progress Studies': 'Optimists studying how civilization advances',
+  'Longevity': 'Life extension and healthspan enthusiasts',
+  'Climate': 'Climate tech and sustainability advocates',
+  'Biotech': 'Biotechnology researchers and founders',
+  'Hardware': 'Hardware hackers and physical world builders',
+  'Design': 'Designers shaping beautiful and functional experiences',
+  'Writing': 'Writers, bloggers, and storytellers',
+  'Music': 'Musicians, producers, and audio creators',
+  'Art': 'Artists and visual creators',
+  'Gaming': 'Game developers and gaming enthusiasts',
+  'Fitness': 'Health and fitness focused community',
+  'Meditation': 'Contemplative practice and mindfulness community',
+  'Psychedelics': 'Explorers of consciousness and altered states',
+  'Polyamory': 'Ethical non-monogamy community',
+  'Queer': 'LGBTQ+ community and allies',
+  'Parents': 'Parents navigating modern family life',
+  'Founders': 'Startup founders and entrepreneurs',
+  'Investors': 'Angel investors and VCs',
+  'Remote Work': 'Digital nomads and remote workers',
+  'Coworking': 'Coworking space enthusiasts',
+  'Coliving': 'Community living and intentional housing',
+};
+
+// Generate a default description for communities not in the list
+const getDescription = (name) => {
+  if (communityDescriptions[name]) return communityDescriptions[name];
+  return `Connect with others in the ${name} community`;
+};
 
 const testimonials = [
   {
@@ -177,7 +239,7 @@ const LandingPage = () => {
           to={isAuthenticated ? "/directory" : "/signup"}
           className="browse-button"
         >
-          Browse
+          Browse Directory
         </Link>
       </section>
 
@@ -218,36 +280,31 @@ const LandingPage = () => {
         </>
       )}
 
-      {isAuthenticated && (
+      {isAuthenticated && Object.keys(memberCounts).length > 0 && (
         /* Community Cards for authenticated users */
         <section className="communities-section">
           <h2 className="communities-title">Explore Communities</h2>
           <div className="communities-grid">
-            {communities.map((community) => (
-              <div
-                key={community.id}
-                className="community-card"
-                style={{ borderLeftColor: community.color }}
-                onClick={() => handleCommunityClick(community.slug)}
-              >
-                <div className="community-card-content">
-                  <h3 className="community-name">{community.name}</h3>
-                  <p className="community-description">{community.description}</p>
-                  <div className="community-meta">
-                    <span
-                      className="community-member-count"
-                      style={{ color: community.color }}
-                    >
-                      {memberCounts[community.name] || 0} members
-                    </span>
+            {Object.entries(memberCounts)
+              .sort((a, b) => b[1] - a[1]) // Sort by member count descending
+              .slice(0, 12) // Show top 12 communities
+              .map(([name, count]) => (
+                <div
+                  key={name}
+                  className="community-card"
+                  onClick={() => handleCommunityClick(toSlug(name))}
+                >
+                  <div className="community-card-content">
+                    <h3 className="community-name">{name}</h3>
+                    <p className="community-description">{getDescription(name)}</p>
+                    <div className="community-meta">
+                      <span className="community-member-count">
+                        {count} members
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div
-                  className="community-accent"
-                  style={{ backgroundColor: community.color }}
-                />
-              </div>
-            ))}
+              ))}
           </div>
         </section>
       )}

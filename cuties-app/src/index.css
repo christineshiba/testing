@@ -1,19 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 :root {
-  --pink-bg: #f5eff5;
-  --navy: #1a1a2e;
-  --navy-dark: #0f0f1e;
-  --text-primary: #2d2d3a;
+  /* Brand colors */
+  --pink-bg: #FDF0F6;
+  --navy: #091747;
+  --navy-dark: #060f2e;
+  --text-primary: #091747;
   --text-secondary: #6b6b7a;
-  --border: #e0d5e0;
-  --white: #ffffff;
-  --accent-pink: #fde8f5;
-  --blue: #3b5bdb;
-  --love-pink: #ffe0e6;
-  --love-pink-text: #d63b5c;
-  --tag-blue: #e0f0ff;
-  --tag-blue-text: #0066cc;
+  --border: #E4E5EB;
+  --white: #FFFFFF;
+  --accent-pink: #FCE8F4;
+  --surface-pink: #F7EAF1;
+  --container-pink: #FCE6F3;
+  --container-pink-alt: #F8DAEE;
+  --peach: #FFDBD1;
+  --yellow: #F5E1A7;
 }
 
 * {

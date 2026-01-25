@@ -121,22 +121,12 @@ const CommunityPage = () => {
   return (
     <div className="community-page">
       {/* Community Header */}
-      <header
-        className="community-header"
-        style={{ borderBottomColor: community.color }}
-      >
+      <header className="community-header">
         <div className="community-header-content">
-          <div
-            className="community-color-badge"
-            style={{ backgroundColor: community.color }}
-          />
           <div className="community-header-text">
             <h1 className="community-title">{community.name}</h1>
             <p className="community-desc">{community.description}</p>
-            <span
-              className="community-members"
-              style={{ color: community.color }}
-            >
+            <span className="community-members">
               {memberCount || members.length} members
             </span>
           </div>
@@ -148,14 +138,12 @@ const CommunityPage = () => {
         <button
           className={`community-tab ${activeTab === 'directory' ? 'active' : ''}`}
           onClick={() => setActiveTab('directory')}
-          style={activeTab === 'directory' ? { borderBottomColor: community.color, color: community.color } : {}}
         >
           Directory
         </button>
         <button
           className={`community-tab ${activeTab === 'feed' ? 'active' : ''}`}
           onClick={() => setActiveTab('feed')}
-          style={activeTab === 'feed' ? { borderBottomColor: community.color, color: community.color } : {}}
         >
           Feed
         </button>
@@ -270,10 +258,7 @@ const CommunityPage = () => {
       {activeTab === 'feed' && (
         <div className="community-feed">
           <div className="feed-placeholder">
-            <div
-              className="feed-placeholder-icon"
-              style={{ backgroundColor: community.color }}
-            >
+            <div className="feed-placeholder-icon">
               <span>Coming Soon</span>
             </div>
             <h3>Community Feed</h3>
