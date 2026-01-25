@@ -40,6 +40,121 @@
   color: white;
 }
 
+/* Social Proof Section */
+.social-proof {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 2rem 2rem;
+  gap: 0.75rem;
+}
+
+.social-proof-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.social-proof-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid var(--pink-bg);
+  object-fit: cover;
+  margin-left: -12px;
+  transition: transform 0.2s;
+}
+
+.social-proof-avatar:first-child {
+  margin-left: 0;
+}
+
+.social-proof-avatar:hover {
+  transform: scale(1.1);
+}
+
+.social-proof-text {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Communities Section (Authenticated) */
+.communities-section {
+  padding: 2rem 2rem 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.communities-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.communities-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.community-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  border-left: 4px solid;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.community-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.community-card-content {
+  position: relative;
+  z-index: 1;
+}
+
+.community-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 0.5rem;
+}
+
+.community-description {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.community-meta {
+  display: flex;
+  align-items: center;
+}
+
+.community-member-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.community-accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  opacity: 0.08;
+  border-radius: 0 12px 0 60px;
+}
+
 .testimonials {
   padding: 3rem 2rem 6rem;
   max-width: 1400px;
@@ -131,6 +246,10 @@
   .testimonials-masonry {
     column-count: 3;
   }
+
+  .communities-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
@@ -154,5 +273,15 @@
 
   .footer-content {
     grid-template-columns: 1fr;
+  }
+
+  .communities-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .social-proof-avatar {
+    width: 40px;
+    height: 40px;
+    margin-left: -10px;
   }
 }

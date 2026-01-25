@@ -1,5 +1,8 @@
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { communities } from '../data/communities';
+import { fetchCommunityMemberCounts, fetchSampleUserAvatars, fetchTotalUserCount } from '../lib/supabase';
 import './LandingPage.css';
 
 const testimonials = [
@@ -64,7 +67,7 @@ const testimonials = [
     author: "@mattixlius"
   },
   {
-    text: "I just scheduled TWO dates with someone off the app 🥺 like we have met, but in we got so excited that we planned TWO things to do this week ☺️",
+    text: "I just scheduled TWO dates with someone off the app like we have met, but in we got so excited that we planned TWO things to do this week",
     author: "anonymous"
   },
   {
@@ -135,6 +138,33 @@ const testimonials = [
 
 const LandingPage = () => {
   const { isAuthenticated } = useApp();
+  const navigate = useNavigate();
+  const [memberCounts, setMemberCounts] = useState({});
+  const [sampleAvatars, setSampleAvatars] = useState([]);
+  const [totalUsers, setTotalUsers] = useState(0);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (isAuthenticated) {
+        // Load community member counts for authenticated users
+        const counts = await fetchCommunityMemberCounts();
+        setMemberCounts(counts);
+      } else {
+        // Load social proof data for non-authenticated users
+        const [avatars, count] = await Promise.all([
+          fetchSampleUserAvatars(8),
+          fetchTotalUserCount()
+        ]);
+        setSampleAvatars(avatars);
+        setTotalUsers(count);
+      }
+    };
+    loadData();
+  }, [isAuthenticated]);
+
+  const handleCommunityClick = (slug) => {
+    navigate(`/community/${slug}`);
+  };
 
   return (
     <div className="landing-page">
@@ -151,16 +181,76 @@ const LandingPage = () => {
         </Link>
       </section>
 
-      <section className="testimonials">
-        <div className="testimonials-masonry">
-          {testimonials.map((testimonial, idx) => (
-            <div key={idx} className="testimonial-card">
-              <p className="testimonial-text">"{testimonial.text}"</p>
-              <p className="testimonial-author">— {testimonial.author}</p>
+      {!isAuthenticated && (
+        <>
+          {/* Social Proof Section for non-authenticated users */}
+          <section className="social-proof">
+            <div className="social-proof-avatars">
+              {sampleAvatars.map((avatar, idx) => (
+                <img
+                  key={avatar.id}
+                  src={avatar.photo}
+                  alt=""
+                  className="social-proof-avatar"
+                  style={{ zIndex: sampleAvatars.length - idx }}
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/48?text=?';
+                  }}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+            <p className="social-proof-text">
+              Join {totalUsers > 0 ? `${totalUsers.toLocaleString()}+` : ''} cuties
+            </p>
+          </section>
+
+          {/* Testimonials for non-authenticated users */}
+          <section className="testimonials">
+            <div className="testimonials-masonry">
+              {testimonials.map((testimonial, idx) => (
+                <div key={idx} className="testimonial-card">
+                  <p className="testimonial-text">"{testimonial.text}"</p>
+                  <p className="testimonial-author">— {testimonial.author}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
+      {isAuthenticated && (
+        /* Community Cards for authenticated users */
+        <section className="communities-section">
+          <h2 className="communities-title">Explore Communities</h2>
+          <div className="communities-grid">
+            {communities.map((community) => (
+              <div
+                key={community.id}
+                className="community-card"
+                style={{ borderLeftColor: community.color }}
+                onClick={() => handleCommunityClick(community.slug)}
+              >
+                <div className="community-card-content">
+                  <h3 className="community-name">{community.name}</h3>
+                  <p className="community-description">{community.description}</p>
+                  <div className="community-meta">
+                    <span
+                      className="community-member-count"
+                      style={{ color: community.color }}
+                    >
+                      {memberCounts[community.name] || 0} members
+                    </span>
+                  </div>
+                </div>
+                <div
+                  className="community-accent"
+                  style={{ backgroundColor: community.color }}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <footer className="landing-footer">
         <div className="footer-content">
