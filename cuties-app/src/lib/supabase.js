@@ -865,11 +865,14 @@ export async function leaveConversation(conversationId, userId) {
 }
 
 // Fetch member counts for all communities
+// Only counts users with name and photo (same as directory filter)
 export async function fetchCommunityMemberCounts() {
   const { data, error } = await supabase
     .from('users')
     .select('communities')
     .not('communities', 'is', null)
+    .not('name', 'is', null)
+    .not('main_photo', 'is', null)
     .neq('paused', true)
     .neq('suspended', true);
 
@@ -955,4 +958,260 @@ export async function fetchTotalUserCount() {
   }
 
   return count || 0;
+}
+
+// ============================================
+// COMMUNITY MEMBERSHIP FUNCTIONS
+// ============================================
+
+// Join a community (add to user's communities array)
+export async function joinCommunity(userId, communityName) {
+  // First get current communities
+  const { data: user, error: fetchError } = await supabase
+    .from('users')
+    .select('communities')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching user communities:', fetchError);
+    return { success: false, error: fetchError };
+  }
+
+  const currentCommunities = user.communities || [];
+
+  // Check if already a member
+  if (currentCommunities.includes(communityName)) {
+    return { success: true, alreadyMember: true };
+  }
+
+  // Add new community
+  const newCommunities = [...currentCommunities, communityName];
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ communities: newCommunities })
+    .eq('id', userId);
+
+  if (updateError) {
+    console.error('Error joining community:', updateError);
+    return { success: false, error: updateError };
+  }
+
+  return { success: true, communities: newCommunities };
+}
+
+// Leave a community (remove from user's communities array)
+export async function leaveCommunity(userId, communityName) {
+  // First get current communities
+  const { data: user, error: fetchError } = await supabase
+    .from('users')
+    .select('communities')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching user communities:', fetchError);
+    return { success: false, error: fetchError };
+  }
+
+  const currentCommunities = user.communities || [];
+
+  // Check if not a member
+  if (!currentCommunities.includes(communityName)) {
+    return { success: true, notMember: true };
+  }
+
+  // Remove community
+  const newCommunities = currentCommunities.filter(c => c !== communityName);
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ communities: newCommunities })
+    .eq('id', userId);
+
+  if (updateError) {
+    console.error('Error leaving community:', updateError);
+    return { success: false, error: updateError };
+  }
+
+  return { success: true, communities: newCommunities };
+}
+
+// Check if user is a member of a community
+export async function isUserInCommunity(userId, communityName) {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('communities')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error checking community membership:', error);
+    return false;
+  }
+
+  return (user.communities || []).includes(communityName);
+}
+
+// ============================================
+// COMMUNITY POSTS FUNCTIONS
+// ============================================
+
+// Create a new community post
+export async function createCommunityPost(authorId, communityName, content) {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .insert({
+      author_id: authorId,
+      community_name: communityName,
+      content: content,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating post:', error);
+    return null;
+  }
+
+  return data;
+}
+
+// Fetch community posts
+export async function fetchCommunityPosts(communityName, { page = 0, limit = 20 } = {}) {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select(`
+      *,
+      author:users!community_posts_author_id_fkey(id, name, main_photo)
+    `)
+    .eq('community_name', communityName)
+    .order('created_at', { ascending: false })
+    .range(page * limit, (page + 1) * limit - 1);
+
+  if (error) {
+    console.error('Error fetching community posts:', error);
+    return [];
+  }
+
+  return data.map(post => ({
+    ...post,
+    author: post.author ? {
+      id: post.author.id,
+      name: post.author.name,
+      photo: fixPhotoUrl(post.author.main_photo),
+    } : null,
+  }));
+}
+
+// Like a post
+export async function likePost(userId, postId) {
+  const { error } = await supabase
+    .from('post_likes')
+    .insert({ user_id: userId, post_id: postId });
+
+  if (error && error.code !== '23505') { // Ignore duplicate key error
+    console.error('Error liking post:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Unlike a post
+export async function unlikePost(userId, postId) {
+  const { error } = await supabase
+    .from('post_likes')
+    .delete()
+    .eq('user_id', userId)
+    .eq('post_id', postId);
+
+  if (error) {
+    console.error('Error unliking post:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Get like count and whether user liked a post
+export async function getPostLikes(postId, userId) {
+  const { count, error: countError } = await supabase
+    .from('post_likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', postId);
+
+  if (countError) {
+    console.error('Error getting like count:', countError);
+    return { count: 0, userLiked: false };
+  }
+
+  const { data: userLike, error: userError } = await supabase
+    .from('post_likes')
+    .select('id')
+    .eq('post_id', postId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return {
+    count: count || 0,
+    userLiked: !!userLike && !userError,
+  };
+}
+
+// Add a comment to a post
+export async function addPostComment(userId, postId, content) {
+  const { data, error } = await supabase
+    .from('post_comments')
+    .insert({
+      author_id: userId,
+      post_id: postId,
+      content: content,
+    })
+    .select(`
+      *,
+      author:users!post_comments_author_id_fkey(id, name, main_photo)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error adding comment:', error);
+    return null;
+  }
+
+  return {
+    ...data,
+    author: data.author ? {
+      id: data.author.id,
+      name: data.author.name,
+      photo: fixPhotoUrl(data.author.main_photo),
+    } : null,
+  };
+}
+
+// Fetch comments for a post
+export async function fetchPostComments(postId) {
+  const { data, error } = await supabase
+    .from('post_comments')
+    .select(`
+      *,
+      author:users!post_comments_author_id_fkey(id, name, main_photo)
+    `)
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching comments:', error);
+    return [];
+  }
+
+  return data.map(comment => ({
+    ...comment,
+    author: comment.author ? {
+      id: comment.author.id,
+      name: comment.author.name,
+      photo: fixPhotoUrl(comment.author.main_photo),
+    } : null,
+  }));
 }
