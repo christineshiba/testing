@@ -1,21 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, UsersThree, Handshake, XLogo, InstagramLogo, Article, YoutubeLogo,
-  CaretDown, Trash, X, ArrowDown
+  CaretDown, Trash, X, ArrowDown, MagnifyingGlass, SpotifyLogo
 } from '@phosphor-icons/react';
+import { fetchAllCommunityNames } from '../lib/supabase';
 import './EditProfilePage.css';
-
-const COMMUNITIES = [
-  'Crypto', 'Farcaster', 'Fractal', 'FuturePARTS', 'Outdoor climbing',
-  'SF Commons', 'Solarpunk', 'Vibecamp', 'Vitapets', 'Vincelator', 'Megavn', 'Ipro', 'Sori'
-];
 
 const HERE_FOR_OPTIONS = [
   { id: 'love', label: 'Love', Icon: Heart },
   { id: 'friends', label: 'Friends', Icon: UsersThree },
   { id: 'collaboration', label: 'Collaboration', Icon: Handshake }
+];
+
+const MONOGAMY_OPTIONS = [
+  'Monogamous',
+  'Polyamorous',
+  'Open to mono or poly',
+  'Monogamish'
+];
+
+const SEXUALITY_OPTIONS = [
+  'Straight',
+  'Gay',
+  'Bisexual',
+  'Queer',
+  'Trans + Straight',
+  'Trans + Lesbian/Gay',
+  'Trans + Bisexual',
+  'Trans + Queer',
+  'Other'
+];
+
+const KIDS_OPTIONS = [
+  'Wants kids',
+  'No kids',
+  'Unsure',
+  'Has kids, wants more',
+  'Has kids, no more',
+  'Has kids, might want more',
+  'Other'
+];
+
+const DRUGS_OPTIONS = [
+  'No drugs',
+  'Yes drugs',
+  'ehhh/sure drugs',
+  'fuck yeah drugs',
+  'prefer not to answer'
 ];
 
 const EditProfilePage = () => {
@@ -36,20 +69,73 @@ const EditProfilePage = () => {
     hobbies: currentUser?.interests?.join(', ') || '',
     communities: currentUser?.communities || [],
     mainPhoto: currentUser?.mainPhoto || currentUser?.photos?.[0] || '',
-    height: currentUser?.height || '',
+    heightFeet: currentUser?.heightFeet || '',
+    heightInches: currentUser?.heightInches || '',
     tweets: currentUser?.tweets || ['', '', ''],
     spotify: currentUser?.spotify || '',
     youtubeEmbed: currentUser?.youtube || '',
-    projects: currentUser?.projects || [{ title: '', link: '', description: '' }],
+    projects: currentUser?.projects || [{ title: '', link: '', description: '', image: '' }],
     morePhotos: currentUser?.morePhotos || [],
     freeformDescription: currentUser?.freeformDescription || '',
     profileSettings: currentUser?.profileSettings || {},
     promptQuestion: currentUser?.promptQuestion || '',
+    monogamy: currentUser?.monoPoly || '',
+    sexuality: currentUser?.sexuality || '',
+    kids: currentUser?.kids || '',
+    drugs: currentUser?.drugs || '',
   });
 
   const [expandedSections, setExpandedSections] = useState({
-    additional: true, aboutMe: true, projects: true, morePhotos: true, freeform: true, settings: true
+    dating: true, aboutMe: true, projects: true, morePhotos: true, freeform: true, settings: true
   });
+
+  // Communities state
+  const [allCommunities, setAllCommunities] = useState([]);
+  const [communitySearch, setCommunitySearch] = useState('');
+  const [showCommunityDropdown, setShowCommunityDropdown] = useState(false);
+  const communityDropdownRef = useRef(null);
+
+  // Fetch all communities on mount
+  useEffect(() => {
+    const loadCommunities = async () => {
+      const communities = await fetchAllCommunityNames();
+      setAllCommunities(communities);
+    };
+    loadCommunities();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (communityDropdownRef.current && !communityDropdownRef.current.contains(event.target)) {
+        setShowCommunityDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter communities based on search
+  const filteredCommunities = allCommunities.filter(c =>
+    c.toLowerCase().includes(communitySearch.toLowerCase()) &&
+    !formData.communities.includes(c)
+  );
+
+  const addCommunity = (community) => {
+    setFormData(prev => ({
+      ...prev,
+      communities: [...prev.communities, community]
+    }));
+    setCommunitySearch('');
+    setShowCommunityDropdown(false);
+  };
+
+  const removeCommunity = (community) => {
+    setFormData(prev => ({
+      ...prev,
+      communities: prev.communities.filter(c => c !== community)
+    }));
+  };
 
   // Wait for session check to complete
   if (loading) {
@@ -81,15 +167,6 @@ const EditProfilePage = () => {
     }));
   };
 
-  const toggleCommunity = (community) => {
-    setFormData(prev => ({
-      ...prev,
-      communities: prev.communities.includes(community)
-        ? prev.communities.filter(c => c !== community)
-        : [...prev.communities, community]
-    }));
-  };
-
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -113,7 +190,7 @@ const EditProfilePage = () => {
   const addProject = () => {
     setFormData(prev => ({
       ...prev,
-      projects: [...prev.projects, { title: '', link: '', description: '' }]
+      projects: [...prev.projects, { title: '', link: '', description: '', image: '' }]
     }));
   };
 
@@ -176,7 +253,8 @@ const EditProfilePage = () => {
       interests: formData.hobbies.split(',').map(i => i.trim()).filter(i => i),
       communities: formData.communities,
       photos: [formData.mainPhoto].filter(p => p),
-      height: formData.height,
+      heightFeet: parseInt(formData.heightFeet) || null,
+      heightInches: parseInt(formData.heightInches) || 0,
       tweets: formData.tweets,
       spotify: formData.spotify,
       youtube: formData.youtubeEmbed,
@@ -185,6 +263,10 @@ const EditProfilePage = () => {
       freeformDescription: formData.freeformDescription,
       profileSettings: formData.profileSettings,
       promptQuestion: formData.promptQuestion,
+      monoPoly: formData.monogamy,
+      sexuality: formData.sexuality,
+      kids: formData.kids,
+      drugs: formData.drugs,
     });
     navigate('/profile');
   };
@@ -340,18 +422,62 @@ const EditProfilePage = () => {
           {/* Communities */}
           <div className="field-group">
             <label className="field-label">Communities</label>
-            <div className="communities-list">
-              {COMMUNITIES.map(community => (
-                <div key={community} className="community-row">
-                  <span className="community-icon">{community.charAt(0)}</span>
-                  <span className="community-name">{community}</span>
-                  <input
-                    type="checkbox"
-                    checked={formData.communities.includes(community)}
-                    onChange={() => toggleCommunity(community)}
-                  />
+
+            {/* Selected communities as tags */}
+            {formData.communities.length > 0 && (
+              <div className="selected-communities">
+                {formData.communities.map(community => (
+                  <span key={community} className="community-tag">
+                    {community}
+                    <button
+                      type="button"
+                      onClick={() => removeCommunity(community)}
+                      className="community-tag-remove"
+                    >
+                      <X size={14} weight="bold" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Searchable dropdown */}
+            <div className="community-dropdown-container" ref={communityDropdownRef}>
+              <div className="community-search-input">
+                <MagnifyingGlass size={18} className="community-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Search communities to join..."
+                  value={communitySearch}
+                  onChange={(e) => {
+                    setCommunitySearch(e.target.value);
+                    setShowCommunityDropdown(true);
+                  }}
+                  onFocus={() => setShowCommunityDropdown(true)}
+                />
+              </div>
+
+              {showCommunityDropdown && (communitySearch || filteredCommunities.length > 0) && (
+                <div className="community-dropdown">
+                  {filteredCommunities.length > 0 ? (
+                    filteredCommunities.slice(0, 10).map(community => (
+                      <button
+                        key={community}
+                        type="button"
+                        className="community-dropdown-item"
+                        onClick={() => addCommunity(community)}
+                      >
+                        <span className="community-icon">{community.charAt(0).toUpperCase()}</span>
+                        <span>{community}</span>
+                      </button>
+                    ))
+                  ) : communitySearch ? (
+                    <div className="community-dropdown-empty">
+                      No communities found matching "{communitySearch}"
+                    </div>
+                  ) : null}
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -391,25 +517,102 @@ const EditProfilePage = () => {
           Everything below this point is optional <ArrowDown size={16} />
         </div>
 
-        {/* Additional Information */}
+        {/* Dating */}
         <div className="form-card collapsible">
-          <div className="section-header" onClick={() => toggleSection('additional')}>
-            <h2 className="section-title">Additional information</h2>
-            <CaretDown size={18} className={`chevron ${expandedSections.additional ? 'up' : ''}`} />
+          <div className="section-header" onClick={() => toggleSection('dating')}>
+            <h2 className="section-title">Dating</h2>
+            <CaretDown size={18} className={`chevron ${expandedSections.dating ? 'up' : ''}`} />
           </div>
-          {expandedSections.additional && (
+          {expandedSections.dating && (
             <div className="section-body">
-              <div className="field-group">
-                <label className="field-label">Height</label>
-                <div className="height-buttons">
-                  {['S', 'M', 'T', '+'].map(h => (
-                    <button
-                      key={h}
-                      type="button"
-                      className={`height-btn ${formData.height === h ? 'active' : ''}`}
-                      onClick={() => setFormData(prev => ({ ...prev, height: h }))}
-                    >{h}</button>
+              <div className="preferences-grid">
+                {/* Monogamy */}
+                <div className="preference-column">
+                  {MONOGAMY_OPTIONS.map(opt => (
+                    <label key={opt} className="radio-option">
+                      <input
+                        type="radio"
+                        name="monogamy"
+                        checked={formData.monogamy === opt}
+                        onChange={() => setFormData(prev => ({ ...prev, monogamy: opt }))}
+                      />
+                      <span>{opt}</span>
+                    </label>
                   ))}
+                </div>
+
+                {/* Sexuality */}
+                <div className="preference-column">
+                  {SEXUALITY_OPTIONS.map(opt => (
+                    <label key={opt} className="radio-option">
+                      <input
+                        type="radio"
+                        name="sexuality"
+                        checked={formData.sexuality === opt}
+                        onChange={() => setFormData(prev => ({ ...prev, sexuality: opt }))}
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Kids */}
+                <div className="preference-column">
+                  {KIDS_OPTIONS.map(opt => (
+                    <label key={opt} className="radio-option">
+                      <input
+                        type="radio"
+                        name="kids"
+                        checked={formData.kids === opt}
+                        onChange={() => setFormData(prev => ({ ...prev, kids: opt }))}
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Drugs */}
+                <div className="preference-column">
+                  {DRUGS_OPTIONS.map(opt => (
+                    <label key={opt} className="radio-option">
+                      <input
+                        type="radio"
+                        name="drugs"
+                        checked={formData.drugs === opt}
+                        onChange={() => setFormData(prev => ({ ...prev, drugs: opt }))}
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Height */}
+              <div className="field-group" style={{ marginTop: '1.5rem' }}>
+                <label className="field-label">Height</label>
+                <div className="height-inputs">
+                  <input
+                    type="number"
+                    name="heightFeet"
+                    value={formData.heightFeet}
+                    onChange={handleChange}
+                    className="height-input"
+                    placeholder="5"
+                    min="3"
+                    max="8"
+                  />
+                  <span className="height-label">ft</span>
+                  <input
+                    type="number"
+                    name="heightInches"
+                    value={formData.heightInches}
+                    onChange={handleChange}
+                    className="height-input"
+                    placeholder="6"
+                    min="0"
+                    max="11"
+                  />
+                  <span className="height-label">in</span>
                 </div>
               </div>
             </div>
@@ -427,37 +630,45 @@ const EditProfilePage = () => {
               <div className="field-group">
                 <label className="field-label">A few tweets of mine</label>
                 {formData.tweets.map((tweet, idx) => (
-                  <input
-                    key={idx}
-                    type="text"
-                    value={tweet}
-                    onChange={(e) => handleTweetChange(idx, e.target.value)}
-                    className="text-input"
-                    placeholder="https://x.com/..."
-                  />
+                  <div key={idx} className="media-input-row">
+                    <XLogo size={20} weight="fill" className="media-icon" />
+                    <input
+                      type="text"
+                      value={tweet}
+                      onChange={(e) => handleTweetChange(idx, e.target.value)}
+                      className="text-input"
+                      placeholder="Paste tweet URL"
+                    />
+                  </div>
                 ))}
               </div>
               <div className="field-group">
                 <label className="field-label">Currently listening on Spotify</label>
-                <input
-                  type="text"
-                  name="spotify"
-                  value={formData.spotify}
-                  onChange={handleChange}
-                  className="text-input"
-                  placeholder="https://open.spotify.com/..."
-                />
+                <div className="media-input-row">
+                  <SpotifyLogo size={20} weight="fill" className="media-icon" />
+                  <input
+                    type="text"
+                    name="spotify"
+                    value={formData.spotify}
+                    onChange={handleChange}
+                    className="text-input"
+                    placeholder="Paste Spotify track or playlist URL"
+                  />
+                </div>
               </div>
               <div className="field-group">
                 <label className="field-label">Embed Youtube video</label>
-                <input
-                  type="text"
-                  name="youtubeEmbed"
-                  value={formData.youtubeEmbed}
-                  onChange={handleChange}
-                  className="text-input"
-                  placeholder="https://youtube.com/..."
-                />
+                <div className="media-input-row">
+                  <YoutubeLogo size={20} weight="fill" className="media-icon" />
+                  <input
+                    type="text"
+                    name="youtubeEmbed"
+                    value={formData.youtubeEmbed}
+                    onChange={handleChange}
+                    className="text-input"
+                    placeholder="Paste YouTube video URL"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -471,45 +682,64 @@ const EditProfilePage = () => {
           </div>
           {expandedSections.projects && (
             <div className="section-body">
-              <div className="projects-grid">
+              <div className="projects-grid-elegant">
                 {formData.projects.map((project, idx) => (
-                  <div key={idx} className="project-edit-card">
-                    <div className="project-image-placeholder">
-                      <span>Cuties!</span>
-                    </div>
-                    <div className="project-fields">
-                      <label>Title</label>
+                  <div key={idx} className="project-card-elegant">
+                    <button type="button" className="project-card-delete" onClick={() => deleteProject(idx)}>
+                      <X size={16} weight="bold" />
+                    </button>
+                    <label className="project-card-image">
+                      {project.image ? (
+                        <img src={project.image} alt={project.title || 'Project'} />
+                      ) : (
+                        <span className="project-image-placeholder">+ Add image</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              handleProjectChange(idx, 'image', reader.result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="file-input-hidden"
+                      />
+                    </label>
+                    <div className="project-card-content">
                       <input
                         type="text"
                         value={project.title}
                         onChange={(e) => handleProjectChange(idx, 'title', e.target.value)}
-                        className="text-input small"
-                        placeholder="Project title"
+                        className="project-title-input"
+                        placeholder="Project name"
                       />
-                      <label>Link</label>
                       <input
                         type="text"
                         value={project.link}
                         onChange={(e) => handleProjectChange(idx, 'link', e.target.value)}
-                        className="text-input small"
-                        placeholder="https://..."
+                        className="project-link-input"
+                        placeholder="projecturl.com"
                       />
-                      <label>Description</label>
-                      <textarea
+                      <input
+                        type="text"
                         value={project.description}
                         onChange={(e) => handleProjectChange(idx, 'description', e.target.value)}
-                        className="textarea-input"
-                        placeholder="Description..."
-                        rows="2"
+                        className="project-desc-input"
+                        placeholder="Brief description..."
                       />
-                      <button type="button" className="delete-btn" onClick={() => deleteProject(idx)}>
-                        <Trash size={16} /> Delete
-                      </button>
                     </div>
                   </div>
                 ))}
+                <button type="button" className="project-card-add" onClick={addProject}>
+                  <span>+</span>
+                  <span>Add project</span>
+                </button>
               </div>
-              <button type="button" className="add-btn" onClick={addProject}>Add one</button>
             </div>
           )}
         </div>
@@ -613,45 +843,16 @@ const EditProfilePage = () => {
         {/* Save Button */}
         <button type="button" className="save-button" onClick={handleSave}>Save</button>
 
-        {/* Danger Zone */}
-        <div className="danger-zone">
-          <button type="button" className="secondary-btn">Remove from directory</button>
-          <button type="button" className="danger-btn" onClick={() => { logout(); navigate('/'); }}>
+        {/* Account Actions */}
+        <div className="account-actions-row">
+          <button type="button" className="flat-btn" onClick={() => { logout(); navigate('/'); }}>
+            Log out
+          </button>
+          <button type="button" className="flat-btn">Remove from directory</button>
+          <button type="button" className="flat-btn danger">
             Delete account
           </button>
         </div>
-
-        {/* Footer */}
-        <footer className="edit-footer">
-          <div className="footer-content">
-            <div className="footer-brand">
-              <span className="footer-logo">Cuties!</span>
-              <span className="footer-tagline">made by @christinewi</span>
-            </div>
-            <div className="footer-links">
-              <div className="footer-col">
-                <span>Product</span>
-                <a href="#">Overview</a>
-                <a href="#">Customers</a>
-              </div>
-              <div className="footer-col">
-                <span>Company</span>
-                <a href="#">About</a>
-                <a href="#">Jobs</a>
-              </div>
-              <div className="footer-col">
-                <span>Support</span>
-                <a href="#">FAQs</a>
-                <a href="#">Contact Us</a>
-              </div>
-              <div className="footer-col">
-                <span>Legal</span>
-                <a href="#">Terms</a>
-                <a href="#">Privacy</a>
-              </div>
-            </div>
-          </div>
-        </footer>
       </div>
     </div>
   );

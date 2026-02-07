@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { supabase, fetchUserById } from '../lib/supabase';
+import { supabase, fetchUserById, createNotification } from '../lib/supabase';
 import { ArrowLeft } from '@phosphor-icons/react';
+import { PageLoading } from '../components/Loading';
 import './ChatPage.css';
 
 const ChatPage = () => {
@@ -61,7 +62,7 @@ const ChatPage = () => {
 
   // Fix protocol-relative URLs
   const fixPhotoUrl = (url) => {
-    if (!url) return 'https://via.placeholder.com/50?text=?';
+    if (!url) return 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
     if (url.startsWith('//')) return 'https:' + url;
     return url;
   };
@@ -112,6 +113,15 @@ const ChatPage = () => {
       } else {
         setMessages((prev) => [...prev, data]);
         setInputMessage('');
+
+        // Create notification for the recipient
+        await createNotification(
+          userId,
+          'message',
+          currentUser.id,
+          null,
+          `/chat/${currentUser.id}`
+        );
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -124,9 +134,7 @@ const ChatPage = () => {
   if (loading) {
     return (
       <div className="chat-page">
-        <div className="chat-container">
-          <p className="loading-text">Loading...</p>
-        </div>
+        <PageLoading message="Loading..." />
       </div>
     );
   }
@@ -139,9 +147,7 @@ const ChatPage = () => {
   if (dataLoading) {
     return (
       <div className="chat-page">
-        <div className="chat-container">
-          <p className="loading-text">Loading conversation...</p>
-        </div>
+        <PageLoading message="Loading conversation..." />
       </div>
     );
   }
@@ -175,7 +181,7 @@ const ChatPage = () => {
               alt={otherUser.name}
               className="chat-avatar"
               onError={(e) => {
-                e.target.src = 'https://via.placeholder.com/50?text=?';
+                e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
               }}
             />
             <div className="chat-user-details">

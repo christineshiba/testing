@@ -1,6 +1,6 @@
 .messages-page {
   min-height: calc(100vh - 60px);
-  background: var(--pink-bg);
+  background: var(--primary-bg);
   padding: 1.5rem 2rem;
 }
 
@@ -19,12 +19,12 @@
 .messages-title {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--navy);
+  color: var(--primary);
   margin: 0;
 }
 
 .new-group-btn {
-  background: var(--navy);
+  background: var(--primary);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -36,7 +36,7 @@
 }
 
 .new-group-btn:hover {
-  background: #2a2a4e;
+  background: var(--navy-dark);
   transform: translateY(-1px);
 }
 
@@ -63,7 +63,7 @@
 .no-messages h2 {
   font-size: 1.5rem;
   margin-bottom: 0.5rem;
-  color: var(--navy);
+  color: var(--primary);
 }
 
 .no-messages p {
@@ -73,7 +73,7 @@
 
 .browse-link {
   display: inline-block;
-  background: var(--navy);
+  background: var(--primary);
   color: white;
   padding: 0.75rem 1.5rem;
   border-radius: 20px;
@@ -83,7 +83,7 @@
 }
 
 .browse-link:hover {
-  background: #2a2a4e;
+  background: var(--navy-dark);
 }
 
 /* Conversations List */
@@ -101,7 +101,7 @@
   padding: 1rem 1.25rem;
   text-decoration: none;
   color: inherit;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gray-300);
   transition: background 0.2s;
 }
 
@@ -110,7 +110,7 @@
 }
 
 .conversation-item:hover {
-  background: #f9f7f9;
+  background: var(--gray-50);
 }
 
 .conversation-avatar {
@@ -135,7 +135,7 @@
 
 .conversation-name {
   font-weight: 600;
-  color: var(--navy);
+  color: var(--primary);
   font-size: 1rem;
 }
 
@@ -162,7 +162,7 @@
 }
 
 .unread-badge {
-  background: var(--navy);
+  background: var(--primary);
   color: white;
   font-size: 0.75rem;
   font-weight: 600;
@@ -177,7 +177,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -186,8 +186,8 @@
 }
 
 .group-badge {
-  background: #e8e4f0;
-  color: #764ba2;
+  background: var(--accent);
+  color: var(--gradient-end);
   font-size: 0.65rem;
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
@@ -227,13 +227,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gray-300);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
-  color: var(--navy);
+  color: var(--primary);
 }
 
 .modal-close {
@@ -264,14 +264,14 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--primary);
   margin-bottom: 0.5rem;
 }
 
 .form-input {
   width: 100%;
   padding: 0.75rem 1rem;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--gray-400);
   border-radius: 10px;
   font-size: 1rem;
   font-family: inherit;
@@ -280,12 +280,12 @@
 
 .form-input:focus {
   outline: none;
-  border-color: var(--navy);
+  border-color: var(--primary);
 }
 
 .search-results {
   margin-top: 0.5rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--gray-400);
   border-radius: 10px;
   max-height: 200px;
   overflow-y: auto;
@@ -301,7 +301,7 @@
 }
 
 .search-result-item:hover {
-  background: #f9f7f9;
+  background: var(--gray-50);
 }
 
 .search-result-avatar {
@@ -319,7 +319,7 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--primary);
   margin-bottom: 0.5rem;
 }
 
@@ -333,7 +333,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #f0f0f0;
+  background: var(--gray-300);
   padding: 0.35rem 0.5rem 0.35rem 0.35rem;
   border-radius: 20px;
   font-size: 0.875rem;
@@ -365,45 +365,10 @@
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 1rem 1.5rem;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--gray-300);
 }
 
-.btn-secondary {
-  background: #f0f0f0;
-  color: var(--navy);
-  border: none;
-  padding: 0.75rem 1.25rem;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-secondary:hover {
-  background: #e0e0e0;
-}
-
-.btn-primary {
-  background: var(--navy);
-  color: white;
-  border: none;
-  padding: 0.75rem 1.25rem;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2a2a4e;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* btn-primary and btn-secondary are now global in index.css */
 
 /* Responsive */
 @media (max-width: 768px) {

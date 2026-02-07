@@ -10,8 +10,8 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showMagicLink, setShowMagicLink] = useState(false);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const navigate = useNavigate();
 
   const handlePasswordLogin = async (e) => {
@@ -43,49 +43,46 @@ const LoginPage = () => {
     }
   };
 
-  const handleMagicLinkLogin = async (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin + '/auth/callback',
-        },
+      const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/auth/callback?type=recovery',
       });
 
       if (authError) {
         throw authError;
       }
 
-      setMagicLinkSent(true);
+      setResetEmailSent(true);
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.');
-      console.error('Magic link error:', err);
+      console.error('Password reset error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  if (magicLinkSent) {
+  if (resetEmailSent) {
     return (
       <div className="auth-page">
         <div className="auth-container">
           <div className="auth-card">
             <h1 className="auth-title">Check your email</h1>
             <p className="auth-message">
-              We sent a magic link to <strong>{email}</strong>
+              We sent a password reset link to <strong>{email}</strong>
             </p>
             <p className="auth-message">
-              Click the link in your email to log in. You can close this tab.
+              Click the link in your email to reset your password.
             </p>
             <button
               className="auth-secondary-btn"
               onClick={() => {
-                setMagicLinkSent(false);
-                setShowMagicLink(false);
+                setResetEmailSent(false);
+                setShowResetPassword(false);
               }}
             >
               Use a different email
@@ -96,18 +93,18 @@ const LoginPage = () => {
     );
   }
 
-  // Magic link form
-  if (showMagicLink) {
+  // Reset password form
+  if (showResetPassword) {
     return (
       <div className="auth-page">
         <div className="auth-container">
           <div className="auth-card">
-            <h1 className="auth-title">Magic link login</h1>
-            <p className="auth-subtitle">We'll send you a link to log in instantly</p>
+            <h1 className="auth-title">Reset password</h1>
+            <p className="auth-subtitle">We'll send you a link to reset your password</p>
 
             {error && <div className="auth-error">{error}</div>}
 
-            <form onSubmit={handleMagicLinkLogin} className="auth-form">
+            <form onSubmit={handleResetPassword} className="auth-form">
               <div className="form-group">
                 <label htmlFor="email">Email</label>
                 <input
@@ -121,15 +118,15 @@ const LoginPage = () => {
               </div>
 
               <button type="submit" className="auth-submit" disabled={loading}>
-                {loading ? 'Sending...' : 'Send magic link'}
+                {loading ? 'Sending...' : 'Send reset link'}
               </button>
             </form>
 
             <button
               className="auth-secondary-btn"
-              onClick={() => setShowMagicLink(false)}
+              onClick={() => setShowResetPassword(false)}
             >
-              Back to password login
+              Back to login
             </button>
           </div>
         </div>
@@ -189,9 +186,9 @@ const LoginPage = () => {
 
           <button
             className="auth-link-btn"
-            onClick={() => setShowMagicLink(true)}
+            onClick={() => setShowResetPassword(true)}
           >
-            Forgot password? Use magic link instead
+            Forgot password?
           </button>
 
           <p className="auth-footer">

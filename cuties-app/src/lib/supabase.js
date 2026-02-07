@@ -5,11 +5,59 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Cuties platform admin email
+export const CUTIES_ADMIN_EMAIL = 'christinetshiba@gmail.com';
+
+// Check if a user is a Cuties platform admin
+export function isCutiesAdmin(user) {
+  return user?.email === CUTIES_ADMIN_EMAIL;
+}
+
 // Helper to fix protocol-relative URLs
 function fixPhotoUrl(url) {
   if (!url) return null;
   if (url.startsWith('//')) return 'https:' + url;
   return url;
+}
+
+// Upload community photo to Supabase Storage
+export async function uploadCommunityPhoto(file, communitySlug) {
+  // Generate unique filename
+  const fileExt = file.name?.split('.').pop() || 'jpg';
+  const fileName = `${communitySlug}-${Date.now()}.${fileExt}`;
+  const filePath = `community-photos/${fileName}`;
+
+  const { data, error } = await supabase.storage
+    .from('photos')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) {
+    console.error('Error uploading community photo:', error);
+    return { error };
+  }
+
+  // Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('photos')
+    .getPublicUrl(filePath);
+
+  return { url: publicUrl };
+}
+
+// Convert base64 data URL to File object
+function dataURLtoFile(dataUrl, filename) {
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
 }
 
 // Helper to transform database user to app user format
@@ -52,6 +100,8 @@ export function transformUser(dbUser) {
     supporterTier: dbUser.supporter_tier,
     showSupporterBadge: dbUser.show_supporter_badge,
     height: dbUser.height_feet ? `${dbUser.height_feet}'${dbUser.height_inches || 0}"` : null,
+    heightFeet: dbUser.height_feet,
+    heightInches: dbUser.height_inches,
     kids: dbUser.kids,
     drugs: dbUser.drugs,
     monoPoly: dbUser.mono_poly,
@@ -249,13 +299,38 @@ export async function fetchMessages(userId1, userId2) {
   }));
 }
 
+// Fetch testimonials for landing page (random sample)
+export async function fetchLandingPageTestimonials(limit = 30) {
+  const { data, error } = await supabase
+    .from('friend_testimonials')
+    .select(`
+      id,
+      content,
+      author:author_id(id, name, username)
+    `)
+    .not('content', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching landing page testimonials:', error);
+    return [];
+  }
+
+  return data.map(t => ({
+    id: t.id,
+    text: t.content,
+    author: t.author?.name || t.author?.username || 'anonymous',
+  }));
+}
+
 // Fetch friend testimonials for a user
 export async function fetchTestimonialsFor(userId) {
   const { data, error } = await supabase
     .from('friend_testimonials')
     .select(`
       *,
-      author:author_id(id, name, main_photo)
+      author:author_id(id, name, username, main_photo)
     `)
     .eq('subject_id', userId);
 
@@ -269,7 +344,7 @@ export async function fetchTestimonialsFor(userId) {
     content: t.content,
     author: t.author ? {
       id: t.author.id,
-      name: t.author.name,
+      name: t.author.name || t.author.username, // Fallback to username if name is null
       photo: fixPhotoUrl(t.author.main_photo),
     } : null,
     createdAt: new Date(t.created_at),
@@ -278,6 +353,18 @@ export async function fetchTestimonialsFor(userId) {
 
 // Fetch projects for a user
 export async function fetchProjectsFor(userId) {
+  // First try to get projects from users table (JSON format)
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('projects_json')
+    .eq('id', userId)
+    .single();
+
+  if (!userError && userData?.projects_json && Array.isArray(userData.projects_json)) {
+    return userData.projects_json;
+  }
+
+  // Fallback to projects table (legacy)
   const { data, error } = await supabase
     .from('projects')
     .select('*')
@@ -294,8 +381,35 @@ export async function fetchProjectsFor(userId) {
     title: p.name,
     description: p.description,
     link: p.link,
-    photo: p.photo_url,
+    image: p.photo_url,
   }));
+}
+
+// Save/update projects for a user (stores as JSON in users table to avoid RLS issues)
+export async function saveProjectsFor(userId, projects) {
+  if (!userId || !projects) return { error: 'Invalid input' };
+
+  // Filter out empty projects (no title and no image)
+  const validProjects = projects.filter(p => p.title || p.image).map((p, index) => ({
+    title: p.title || '',
+    description: p.description || '',
+    link: p.link || '',
+    image: p.image || null,
+    display_order: index,
+  }));
+
+  // Store projects as JSON in the users table
+  const { error } = await supabase
+    .from('users')
+    .update({ projects_json: validProjects })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Error saving projects:', error);
+    return { error };
+  }
+
+  return { data: validProjects };
 }
 
 // Send a like (interest)
@@ -864,6 +978,15 @@ export async function leaveConversation(conversationId, userId) {
   return true;
 }
 
+// Fetch all unique communities from database (sorted by member count)
+export async function fetchAllCommunities() {
+  const counts = await fetchCommunityMemberCounts();
+  // Sort by member count descending
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name);
+}
+
 // Fetch member counts for all communities
 // Only counts users with name and photo (same as directory filter)
 export async function fetchCommunityMemberCounts() {
@@ -894,31 +1017,115 @@ export async function fetchCommunityMemberCounts() {
   return counts;
 }
 
+// Fetch sample member avatars for communities (for social proof)
+export async function fetchCommunityMemberAvatars(limit = 4) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, main_photo, communities')
+    .not('communities', 'is', null)
+    .not('main_photo', 'is', null)
+    .neq('paused', true)
+    .neq('suspended', true)
+    .limit(150);
+
+  if (error) {
+    console.error('Error fetching community member avatars:', error);
+    return {};
+  }
+
+  // Group avatars by community
+  const avatarsByCommunity = {};
+  data.forEach(user => {
+    if (user.communities && Array.isArray(user.communities)) {
+      user.communities.forEach(community => {
+        if (!avatarsByCommunity[community]) {
+          avatarsByCommunity[community] = [];
+        }
+        if (avatarsByCommunity[community].length < limit) {
+          avatarsByCommunity[community].push({
+            id: user.id,
+            photo: fixPhotoUrl(user.main_photo),
+          });
+        }
+      });
+    }
+  });
+
+  return avatarsByCommunity;
+}
+
 // Fetch users filtered by community
-export async function fetchUsersByCommunity(communityName, { page = 0, limit = 20, search = '' } = {}) {
-  let query = supabase
+export async function fetchUsersByCommunity(communityName, { page = 0, limit = 20, search = '', communityId = null } = {}) {
+  // Fetch users who have the community in their profile (legacy)
+  let legacyQuery = supabase
     .from('users')
     .select('*')
     .not('name', 'is', null)
     .not('main_photo', 'is', null)
     .neq('paused', true)
     .neq('suspended', true)
-    .contains('communities', [communityName])
-    .order('created_at', { ascending: false })
-    .range(page * limit, (page + 1) * limit - 1);
+    .contains('communities', [communityName]);
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,short_description.ilike.%${search}%,new_location.ilike.%${search}%`);
+    legacyQuery = legacyQuery.or(`name.ilike.%${search}%,short_description.ilike.%${search}%,new_location.ilike.%${search}%`);
   }
 
-  const { data, error } = await query;
+  const { data: legacyData, error: legacyError } = await legacyQuery;
 
-  if (error) {
-    console.error('Error fetching users by community:', error);
-    return [];
+  if (legacyError) {
+    console.error('Error fetching users by community:', legacyError);
   }
 
-  return data.map(transformUser);
+  const legacyUsers = legacyData ? legacyData.map(transformUser) : [];
+
+  // If there's a communityId, also fetch from community_members table
+  let memberUsers = [];
+  if (communityId) {
+    let memberQuery = supabase
+      .from('community_members')
+      .select(`
+        user:user_id(*)
+      `)
+      .eq('community_id', communityId);
+
+    const { data: memberData, error: memberError } = await memberQuery;
+
+    if (memberError) {
+      console.error('Error fetching community members:', memberError);
+    } else if (memberData) {
+      // Transform and filter member users
+      memberUsers = memberData
+        .filter(m => m.user && m.user.name && m.user.main_photo && !m.user.paused && !m.user.suspended)
+        .map(m => transformUser(m.user));
+
+      // Apply search filter if provided
+      if (search) {
+        const searchLower = search.toLowerCase();
+        memberUsers = memberUsers.filter(u =>
+          u.name?.toLowerCase().includes(searchLower) ||
+          u.bio?.toLowerCase().includes(searchLower) ||
+          u.location?.toLowerCase().includes(searchLower)
+        );
+      }
+    }
+  }
+
+  // Combine and deduplicate by user ID
+  const userMap = new Map();
+  [...legacyUsers, ...memberUsers].forEach(user => {
+    if (!userMap.has(user.id)) {
+      userMap.set(user.id, user);
+    }
+  });
+
+  // Convert to array, sort, and paginate
+  const allUsers = Array.from(userMap.values())
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  // Apply pagination
+  const start = page * limit;
+  const end = start + limit;
+  return allUsers.slice(start, end);
 }
 
 // Fetch sample user avatars for social proof
@@ -1078,7 +1285,7 @@ export async function createCommunityPost(authorId, communityName, content) {
   return data;
 }
 
-// Fetch community posts
+// Fetch community posts (only top-level, not replies)
 export async function fetchCommunityPosts(communityName, { page = 0, limit = 20 } = {}) {
   const { data, error } = await supabase
     .from('community_posts')
@@ -1087,11 +1294,49 @@ export async function fetchCommunityPosts(communityName, { page = 0, limit = 20 
       author:users!community_posts_author_id_fkey(id, name, main_photo)
     `)
     .eq('community_name', communityName)
+    .is('parent_id', null)
     .order('created_at', { ascending: false })
     .range(page * limit, (page + 1) * limit - 1);
 
   if (error) {
     console.error('Error fetching community posts:', error);
+    return [];
+  }
+
+  // Get reply counts for each post
+  const postsWithCounts = await Promise.all(data.map(async (post) => {
+    const { count } = await supabase
+      .from('community_posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', post.id);
+
+    return {
+      ...post,
+      author: post.author ? {
+        id: post.author.id,
+        name: post.author.name,
+        photo: fixPhotoUrl(post.author.main_photo),
+      } : null,
+      replyCount: count || 0,
+    };
+  }));
+
+  return postsWithCounts;
+}
+
+// Fetch thread replies for a post
+export async function fetchPostReplies(parentId) {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select(`
+      *,
+      author:users!community_posts_author_id_fkey(id, name, main_photo)
+    `)
+    .eq('parent_id', parentId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching post replies:', error);
     return [];
   }
 
@@ -1103,6 +1348,27 @@ export async function fetchCommunityPosts(communityName, { page = 0, limit = 20 
       photo: fixPhotoUrl(post.author.main_photo),
     } : null,
   }));
+}
+
+// Create a reply to a post (thread)
+export async function createPostReply(authorId, communityName, content, parentId) {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .insert({
+      author_id: authorId,
+      community_name: communityName,
+      content: content,
+      parent_id: parentId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating reply:', error);
+    return null;
+  }
+
+  return data;
 }
 
 // Like a post
@@ -1214,4 +1480,1555 @@ export async function fetchPostComments(postId) {
       photo: fixPhotoUrl(comment.author.main_photo),
     } : null,
   }));
+}
+
+// ============================================
+// COMMUNITY CHANNELS FUNCTIONS
+// ============================================
+
+// Create a new channel
+export async function createChannel(communityName, name, description, isPrivate, createdBy) {
+  const { data, error } = await supabase
+    .from('community_channels')
+    .insert({
+      community_name: communityName,
+      name: name,
+      description: description,
+      is_private: isPrivate,
+      created_by: createdBy,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating channel:', error);
+    return null;
+  }
+
+  // If private, add creator as admin member
+  if (isPrivate && data) {
+    await supabase
+      .from('channel_members')
+      .insert({
+        channel_id: data.id,
+        user_id: createdBy,
+        role: 'admin',
+      });
+  }
+
+  return data;
+}
+
+// Fetch channels for a community
+export async function fetchCommunityChannels(communityName, userId) {
+  const { data, error } = await supabase
+    .from('community_channels')
+    .select(`
+      *,
+      creator:users!community_channels_created_by_fkey(id, name, main_photo)
+    `)
+    .eq('community_name', communityName)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching channels:', error);
+    return [];
+  }
+
+  // For private channels, check if user is a member
+  const channelsWithAccess = await Promise.all(data.map(async (channel) => {
+    let hasAccess = !channel.is_private; // Public channels accessible to all
+    let memberCount = 0;
+
+    if (channel.is_private && userId) {
+      const { data: membership } = await supabase
+        .from('channel_members')
+        .select('id')
+        .eq('channel_id', channel.id)
+        .eq('user_id', userId)
+        .maybeSingle();
+      hasAccess = !!membership;
+    }
+
+    // Get member count for private channels
+    if (channel.is_private) {
+      const { count } = await supabase
+        .from('channel_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', channel.id);
+      memberCount = count || 0;
+    }
+
+    return {
+      ...channel,
+      creator: channel.creator ? {
+        id: channel.creator.id,
+        name: channel.creator.name,
+        photo: fixPhotoUrl(channel.creator.main_photo),
+      } : null,
+      hasAccess,
+      memberCount,
+    };
+  }));
+
+  return channelsWithAccess;
+}
+
+// Fetch channels across all user's communities (both from profile and membership)
+export async function fetchUserCommunityChannels(userId, userCommunities = []) {
+  // Get communities user has joined via community_members table
+  const { data: memberships, error: memberError } = await supabase
+    .from('community_members')
+    .select('community:community_id(name)')
+    .eq('user_id', userId);
+
+  if (memberError) {
+    console.error('Error fetching user memberships:', memberError);
+  }
+
+  // Combine communities from profile and memberships
+  const joinedCommunities = memberships
+    ? memberships.map(m => m.community?.name).filter(Boolean)
+    : [];
+
+  const allCommunities = [...new Set([...(userCommunities || []), ...joinedCommunities])];
+
+  if (allCommunities.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('community_channels')
+    .select(`
+      *,
+      creator:users!community_channels_created_by_fkey(id, name, main_photo)
+    `)
+    .in('community_name', allCommunities)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching user community channels:', error);
+    return [];
+  }
+
+  // For private channels, check if user is a member
+  const channelsWithAccess = await Promise.all(data.map(async (channel) => {
+    let hasAccess = !channel.is_private;
+
+    if (channel.is_private && userId) {
+      const { data: membership } = await supabase
+        .from('channel_members')
+        .select('id')
+        .eq('channel_id', channel.id)
+        .eq('user_id', userId)
+        .maybeSingle();
+      hasAccess = !!membership;
+    }
+
+    return {
+      ...channel,
+      creator: channel.creator ? {
+        id: channel.creator.id,
+        name: channel.creator.name,
+        photo: fixPhotoUrl(channel.creator.main_photo),
+      } : null,
+      hasAccess,
+    };
+  }));
+
+  // Filter to only show accessible channels
+  return channelsWithAccess.filter(ch => ch.hasAccess);
+}
+
+// Join a channel (for private channels)
+export async function joinChannel(channelId, userId) {
+  const { error } = await supabase
+    .from('channel_members')
+    .insert({
+      channel_id: channelId,
+      user_id: userId,
+      role: 'member',
+    });
+
+  if (error && error.code !== '23505') { // Ignore duplicate
+    console.error('Error joining channel:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Leave a channel
+export async function leaveChannel(channelId, userId) {
+  const { error } = await supabase
+    .from('channel_members')
+    .delete()
+    .eq('channel_id', channelId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error leaving channel:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Fetch channel messages (only top-level, not thread replies)
+export async function fetchChannelMessages(channelId, { page = 0, limit = 50 } = {}) {
+  const { data, error } = await supabase
+    .from('channel_messages')
+    .select(`
+      *,
+      author:users!channel_messages_author_id_fkey(id, name, main_photo)
+    `)
+    .eq('channel_id', channelId)
+    .is('parent_id', null)
+    .order('created_at', { ascending: true })
+    .range(page * limit, (page + 1) * limit - 1);
+
+  if (error) {
+    console.error('Error fetching channel messages:', error);
+    return [];
+  }
+
+  // Get reply counts for each message
+  const messagesWithCounts = await Promise.all(data.map(async (msg) => {
+    const { count } = await supabase
+      .from('channel_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', msg.id);
+
+    return {
+      ...msg,
+      author: msg.author ? {
+        id: msg.author.id,
+        name: msg.author.name,
+        photo: fixPhotoUrl(msg.author.main_photo),
+      } : null,
+      replyCount: count || 0,
+    };
+  }));
+
+  return messagesWithCounts;
+}
+
+// Fetch thread replies for a channel message
+export async function fetchMessageReplies(parentId) {
+  const { data, error } = await supabase
+    .from('channel_messages')
+    .select(`
+      *,
+      author:users!channel_messages_author_id_fkey(id, name, main_photo)
+    `)
+    .eq('parent_id', parentId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching message replies:', error);
+    return [];
+  }
+
+  return data.map(msg => ({
+    ...msg,
+    author: msg.author ? {
+      id: msg.author.id,
+      name: msg.author.name,
+      photo: fixPhotoUrl(msg.author.main_photo),
+    } : null,
+  }));
+}
+
+// Create a thread reply to a channel message
+export async function createMessageReply(channelId, authorId, content, parentId) {
+  const { data, error } = await supabase
+    .from('channel_messages')
+    .insert({
+      channel_id: channelId,
+      author_id: authorId,
+      content: content,
+      parent_id: parentId,
+    })
+    .select(`
+      *,
+      author:users!channel_messages_author_id_fkey(id, name, main_photo)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error creating message reply:', error);
+    return null;
+  }
+
+  return {
+    ...data,
+    author: data.author ? {
+      id: data.author.id,
+      name: data.author.name,
+      photo: fixPhotoUrl(data.author.main_photo),
+    } : null,
+  };
+}
+
+// Send a message to a channel
+// Upload a file to Supabase Storage
+export async function uploadMessageAttachment(file, channelId, authorId) {
+  console.log('Uploading file:', file.name, 'to channel:', channelId);
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${channelId}/${authorId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+  const { data, error } = await supabase.storage
+    .from('message-attachments')
+    .upload(fileName, file);
+
+  if (error) {
+    console.error('Error uploading file:', error);
+    return null;
+  }
+  console.log('File uploaded successfully:', data);
+
+  // Get the public URL
+  const { data: urlData } = supabase.storage
+    .from('message-attachments')
+    .getPublicUrl(fileName);
+
+  return {
+    url: urlData.publicUrl,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  };
+}
+
+export async function sendChannelMessage(channelId, authorId, content, attachments = null) {
+  // Upload attachments first if any
+  let attachmentUrls = null;
+  if (attachments && attachments.length > 0) {
+    const uploadedAttachments = await Promise.all(
+      attachments.map(att => uploadMessageAttachment(att.file, channelId, authorId))
+    );
+    // Filter out failed uploads
+    attachmentUrls = uploadedAttachments.filter(a => a !== null);
+    if (attachmentUrls.length === 0) {
+      attachmentUrls = null;
+    }
+  }
+
+  // Use empty string if no content (allows posting just attachments)
+  const messageContent = content || '';
+
+  const { data, error } = await supabase
+    .from('channel_messages')
+    .insert({
+      channel_id: channelId,
+      author_id: authorId,
+      content: messageContent,
+      attachments: attachmentUrls,
+    })
+    .select(`
+      *,
+      author:users!channel_messages_author_id_fkey(id, name, main_photo)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error sending message:', error);
+    return null;
+  }
+
+  return {
+    ...data,
+    author: data.author ? {
+      id: data.author.id,
+      name: data.author.name,
+      photo: fixPhotoUrl(data.author.main_photo),
+    } : null,
+  };
+}
+
+// Get channel members
+export async function fetchChannelMembers(channelId) {
+  const { data, error } = await supabase
+    .from('channel_members')
+    .select(`
+      *,
+      user:users!channel_members_user_id_fkey(id, name, main_photo)
+    `)
+    .eq('channel_id', channelId)
+    .order('joined_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching channel members:', error);
+    return [];
+  }
+
+  return data.map(m => ({
+    ...m,
+    user: m.user ? {
+      id: m.user.id,
+      name: m.user.name,
+      photo: fixPhotoUrl(m.user.main_photo),
+    } : null,
+  }));
+}
+
+// Delete a channel (only creator)
+export async function deleteChannel(channelId) {
+  const { error } = await supabase
+    .from('community_channels')
+    .delete()
+    .eq('id', channelId);
+
+  if (error) {
+    console.error('Error deleting channel:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// ============================================
+// COMMUNITY MANAGEMENT FUNCTIONS
+// ============================================
+
+// Helper to generate slug from name
+function generateSlug(name) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+// Helper to generate random alphanumeric code
+function generateInviteCode(length = 8) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Create a new community
+// visibility: 'public' | 'semi-public' | 'private'
+// pricingOptions: { hasPaidMembership, membershipType, membershipPrice, subscriptionInterval }
+export async function createCommunity(name, description, visibility, creatorId, photo = null, isCutiesOfficial = false, pricingOptions = null) {
+  const slug = generateSlug(name);
+
+  // Map visibility to is_private for backwards compatibility
+  const isPrivate = visibility === 'private';
+
+  // Upload photo to storage if it's a base64 data URL
+  let photoUrl = null;
+  if (photo && photo.startsWith('data:')) {
+    const file = dataURLtoFile(photo, `${slug}.jpg`);
+    const { url, error: uploadError } = await uploadCommunityPhoto(file, slug);
+    if (uploadError) {
+      console.error('Error uploading community photo:', uploadError);
+      // Continue without photo
+    } else {
+      photoUrl = url;
+    }
+  } else if (photo) {
+    // Already a URL
+    photoUrl = photo;
+  }
+
+  // Build community data
+  const communityData = {
+    name: name.trim(),
+    slug,
+    description: description?.trim() || null,
+    is_private: isPrivate,
+    visibility: visibility || 'public',
+    created_by: creatorId,
+    photo_url: photoUrl,
+    is_cuties_official: isCutiesOfficial,
+  };
+
+  // Add pricing fields if provided
+  if (pricingOptions && pricingOptions.hasPaidMembership) {
+    communityData.has_paid_membership = true;
+    communityData.membership_type = pricingOptions.membershipType;
+    communityData.membership_price = pricingOptions.membershipPrice;
+    communityData.membership_currency = 'USD';
+    if (pricingOptions.membershipType === 'subscription') {
+      communityData.subscription_interval = pricingOptions.subscriptionInterval;
+    }
+  }
+
+  // Create the community
+  const { data: community, error: communityError } = await supabase
+    .from('communities')
+    .insert(communityData)
+    .select()
+    .single();
+
+  if (communityError) {
+    console.error('Error creating community:', communityError);
+    return { error: communityError };
+  }
+
+  // Add creator as admin in community_members table
+  const { error: memberError } = await supabase
+    .from('community_members')
+    .insert({
+      community_id: community.id,
+      user_id: creatorId,
+      role: 'admin',
+    });
+
+  if (memberError) {
+    console.error('Error adding creator as admin:', memberError);
+    // Community was created, so still return it
+  }
+
+  // Also add community to creator's profile communities array (so they show in directory)
+  await joinCommunity(creatorId, community.name);
+
+  return { data: community };
+}
+
+// Fetch community by slug
+export async function fetchCommunityBySlug(slug) {
+  const { data, error } = await supabase
+    .from('communities')
+    .select('*')
+    .eq('slug', slug)
+    .single();
+
+  if (error) {
+    if (error.code !== 'PGRST116') { // Not found is ok
+      console.error('Error fetching community by slug:', error);
+    }
+    return null;
+  }
+
+  return data;
+}
+
+// Fetch community by ID
+export async function fetchCommunityById(communityId) {
+  const { data, error } = await supabase
+    .from('communities')
+    .select('*')
+    .eq('id', communityId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching community by id:', error);
+    return null;
+  }
+
+  return data;
+}
+
+// Add a member to a community
+// Main community ID - all users are automatically added to this community
+export const MAIN_COMMUNITY_ID = 'a0000000-0000-0000-0000-000000000001';
+
+// Join user to the main community
+export async function joinMainCommunity(userId) {
+  // First check if main community exists
+  const { data: mainCommunity } = await supabase
+    .from('communities')
+    .select('id')
+    .eq('id', MAIN_COMMUNITY_ID)
+    .single();
+
+  if (!mainCommunity) {
+    console.warn('Main community does not exist yet');
+    return { error: 'Main community not found' };
+  }
+
+  return addCommunityMember(MAIN_COMMUNITY_ID, userId, 'member');
+}
+
+export async function addCommunityMember(communityId, userId, role = 'member') {
+  const { data, error } = await supabase
+    .from('community_members')
+    .insert({
+      community_id: communityId,
+      user_id: userId,
+      role,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') { // Duplicate key - already a member
+      return { data: null, alreadyMember: true };
+    }
+    console.error('Error adding community member:', error);
+    return { error };
+  }
+
+  return { data };
+}
+
+// Remove a member from a community
+export async function removeCommunityMember(communityId, userId) {
+  const { error } = await supabase
+    .from('community_members')
+    .delete()
+    .eq('community_id', communityId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error removing community member:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Get user's role in a community
+export async function getUserCommunityRole(communityId, userId) {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select('role')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) {
+    if (error.code !== 'PGRST116') { // Not found is ok
+      console.error('Error getting user community role:', error);
+    }
+    return null;
+  }
+
+  return data?.role || null;
+}
+
+// Check if user is a member of a community (by community ID)
+export async function isUserCommunityMember(communityId, userId) {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error checking community membership:', error);
+    return false;
+  }
+
+  return !!data;
+}
+
+// Get community member count
+export async function getCommunityMemberCount(communityId) {
+  const { count, error } = await supabase
+    .from('community_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('community_id', communityId);
+
+  if (error) {
+    console.error('Error getting community member count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+// Create an invite link for a community
+export async function createCommunityInvite(communityId, creatorId, options = {}) {
+  const { expiresAt = null, maxUses = null } = options;
+
+  // Generate unique code
+  let code = generateInviteCode();
+  let attempts = 0;
+  const maxAttempts = 5;
+
+  // Try to insert, regenerate code if collision
+  while (attempts < maxAttempts) {
+    const { data, error } = await supabase
+      .from('community_invites')
+      .insert({
+        community_id: communityId,
+        code,
+        created_by: creatorId,
+        expires_at: expiresAt,
+        max_uses: maxUses,
+      })
+      .select()
+      .single();
+
+    if (!error) {
+      return { data };
+    }
+
+    if (error.code === '23505') { // Duplicate code
+      code = generateInviteCode();
+      attempts++;
+    } else {
+      console.error('Error creating invite:', error);
+      return { error };
+    }
+  }
+
+  return { error: { message: 'Failed to generate unique invite code' } };
+}
+
+// Get invite by code
+export async function getInviteByCode(code) {
+  const { data, error } = await supabase
+    .from('community_invites')
+    .select(`
+      *,
+      community:community_id(id, name, slug, description, is_private)
+    `)
+    .eq('code', code.toUpperCase())
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error('Error getting invite:', error);
+    }
+    return null;
+  }
+
+  // Check if expired
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    return null;
+  }
+
+  // Check if max uses reached
+  if (data.max_uses !== null && data.use_count >= data.max_uses) {
+    return null;
+  }
+
+  return data;
+}
+
+// Redeem an invite code
+export async function redeemInvite(code, userId) {
+  // Get the invite
+  const invite = await getInviteByCode(code);
+
+  if (!invite) {
+    return { error: { message: 'Invalid or expired invite code' } };
+  }
+
+  // Check if user is already a member
+  const isMember = await isUserCommunityMember(invite.community_id, userId);
+  if (isMember) {
+    return {
+      data: invite.community,
+      alreadyMember: true
+    };
+  }
+
+  // Add user to community
+  const { error: memberError } = await addCommunityMember(invite.community_id, userId, 'member');
+
+  if (memberError) {
+    return { error: memberError };
+  }
+
+  // Increment use count
+  await supabase
+    .from('community_invites')
+    .update({ use_count: invite.use_count + 1 })
+    .eq('id', invite.id);
+
+  return { data: invite.community };
+}
+
+// Deactivate an invite
+export async function deactivateInvite(inviteId) {
+  const { error } = await supabase
+    .from('community_invites')
+    .update({ is_active: false })
+    .eq('id', inviteId);
+
+  if (error) {
+    console.error('Error deactivating invite:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Get all invites for a community
+export async function getCommunityInvites(communityId) {
+  const { data, error } = await supabase
+    .from('community_invites')
+    .select(`
+      *,
+      creator:created_by(id, name, main_photo)
+    `)
+    .eq('community_id', communityId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error getting community invites:', error);
+    return [];
+  }
+
+  return data.map(invite => ({
+    ...invite,
+    creator: invite.creator ? {
+      id: invite.creator.id,
+      name: invite.creator.name,
+      photo: fixPhotoUrl(invite.creator.main_photo),
+    } : null,
+  }));
+}
+
+// Delete a community (admin or moderator only)
+export async function deleteCommunity(communityId) {
+  const { error } = await supabase
+    .from('communities')
+    .delete()
+    .eq('id', communityId);
+
+  if (error) {
+    console.error('Error deleting community:', error);
+    return { error };
+  }
+
+  return { success: true };
+}
+
+// Update community details
+export async function updateCommunity(communityId, updates) {
+  const { data, error } = await supabase
+    .from('communities')
+    .update(updates)
+    .eq('id', communityId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating community:', error);
+    return { error };
+  }
+
+  return { data };
+}
+
+// Check if there are other admins in the community (besides the given user)
+export async function hasOtherAdmins(communityId, userId) {
+  const { count, error } = await supabase
+    .from('community_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('community_id', communityId)
+    .eq('role', 'admin')
+    .neq('user_id', userId);
+
+  if (error) {
+    console.error('Error checking for other admins:', error);
+    return false;
+  }
+
+  return (count || 0) > 0;
+}
+
+// Fetch community moderators and admins
+export async function fetchCommunityModerators(communityId) {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select(`
+      role,
+      joined_at,
+      user:user_id(id, name, main_photo, short_description, new_location)
+    `)
+    .eq('community_id', communityId)
+    .in('role', ['admin', 'moderator'])
+    .order('role', { ascending: true }); // admins first
+
+  if (error) {
+    console.error('Error fetching community moderators:', error);
+    return [];
+  }
+
+  return data.map(m => ({
+    role: m.role,
+    joinedAt: m.joined_at,
+    user: m.user ? {
+      id: m.user.id,
+      name: m.user.name,
+      photo: fixPhotoUrl(m.user.main_photo),
+      bio: m.user.short_description,
+      location: m.user.new_location,
+    } : null,
+  })).filter(m => m.user !== null);
+}
+
+// Fetch all community names (for dropdowns like edit profile)
+// This combines created communities with legacy communities from user profiles
+export async function fetchAllCommunityNames() {
+  const communitySet = new Set();
+
+  // Fetch all created communities (public ones)
+  const { data: createdData, error: createdError } = await supabase
+    .from('communities')
+    .select('name')
+    .order('name');
+
+  if (!createdError && createdData) {
+    createdData.forEach(c => communitySet.add(c.name));
+  }
+
+  // Fetch all unique communities from user profiles (legacy)
+  const { data: usersData, error: usersError } = await supabase
+    .from('users')
+    .select('communities');
+
+  if (!usersError && usersData) {
+    usersData.forEach(user => {
+      if (user.communities && Array.isArray(user.communities)) {
+        user.communities.forEach(c => communitySet.add(c));
+      }
+    });
+  }
+
+  // Return sorted array
+  return Array.from(communitySet).sort((a, b) =>
+    a.toLowerCase().localeCompare(b.toLowerCase())
+  );
+}
+
+// Fetch communities user is a member of
+export async function fetchUserCommunities(userId, userProfileCommunities = []) {
+  // Get communities from community_members table
+  const { data: memberships, error: memberError } = await supabase
+    .from('community_members')
+    .select(`
+      role,
+      joined_at,
+      community:community_id(id, name, slug, description, is_private, photo_url)
+    `)
+    .eq('user_id', userId);
+
+  if (memberError) {
+    console.error('Error fetching user communities:', memberError);
+  }
+
+  // Build a map of joined communities with their roles
+  const joinedCommunities = new Map();
+  if (memberships) {
+    memberships.forEach(m => {
+      if (m.community) {
+        joinedCommunities.set(m.community.name, {
+          ...m.community,
+          role: m.role,
+          joinedAt: m.joined_at,
+          isCreated: true,
+        });
+      }
+    });
+  }
+
+  // Add profile communities (legacy) that aren't in community_members
+  const allCommunities = [];
+
+  // First add joined communities
+  joinedCommunities.forEach(community => {
+    allCommunities.push(community);
+  });
+
+  // Then add profile communities not already in the list
+  if (userProfileCommunities && Array.isArray(userProfileCommunities)) {
+    userProfileCommunities.forEach(name => {
+      if (!joinedCommunities.has(name)) {
+        allCommunities.push({
+          name,
+          slug: name.toLowerCase().replace(/\s+/g, '-'),
+          description: null,
+          is_private: false,
+          isCreated: false,
+        });
+      }
+    });
+  }
+
+  // Get member counts for all communities
+  const communityNames = allCommunities.map(c => c.name);
+  const counts = await fetchCommunityMemberCounts();
+
+  return allCommunities.map(c => ({
+    ...c,
+    memberCount: counts[c.name] || 0,
+  }));
+}
+
+// Fetch all user memberships (returns map of community name -> role)
+export async function fetchUserMemberships(userId, userProfileCommunities = []) {
+  if (!userId) return {};
+
+  const memberships = {};
+
+  // Get memberships from community_members table
+  const { data, error } = await supabase
+    .from('community_members')
+    .select(`
+      role,
+      community:community_id(name)
+    `)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error fetching user memberships:', error);
+  } else if (data) {
+    data.forEach(m => {
+      if (m.community?.name) {
+        memberships[m.community.name] = m.role;
+      }
+    });
+  }
+
+  // Add profile communities as "member" if not already in memberships
+  if (userProfileCommunities && Array.isArray(userProfileCommunities)) {
+    userProfileCommunities.forEach(name => {
+      if (!memberships[name]) {
+        memberships[name] = 'member';
+      }
+    });
+  }
+
+  return memberships;
+}
+
+// Fetch all created communities (for displaying in directory)
+// Note: This now filters by visibility, showing public communities only
+// For discoverable communities (public + semi-public), use fetchDiscoverableCommunities
+export async function fetchCreatedCommunities() {
+  const { data, error } = await supabase
+    .from('communities')
+    .select(`
+      *,
+      member_count:community_members(count)
+    `)
+    .or('visibility.eq.public,visibility.is.null,is_private.eq.false')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching created communities:', error);
+    return [];
+  }
+
+  return data.map(c => ({
+    ...c,
+    memberCount: c.member_count?.[0]?.count || 0,
+  }));
+}
+
+// Fetch adjacent communities (communities that share members with the given community)
+export async function fetchAdjacentCommunities(communityName, limit = 10) {
+  // Get all users who are members of this community
+  const { data: members, error: membersError } = await supabase
+    .from('users')
+    .select('communities')
+    .contains('communities', [communityName]);
+
+  if (membersError) {
+    console.error('Error fetching community members:', membersError);
+    return [];
+  }
+
+  // Count occurrences of each community across all members
+  const communityCounts = {};
+  members.forEach(member => {
+    (member.communities || []).forEach(comm => {
+      if (comm !== communityName) {
+        communityCounts[comm] = (communityCounts[comm] || 0) + 1;
+      }
+    });
+  });
+
+  // Sort by overlap count and return top communities
+  const sortedCommunities = Object.entries(communityCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({
+      name,
+      slug: name.toLowerCase().replace(/\s+/g, '-').replace(/'/g, ''),
+      overlapCount: count,
+    }));
+
+  return sortedCommunities;
+}
+
+// ==================== NOTIFICATIONS ====================
+
+// Create a notification
+export async function createNotification(userId, type, fromUserId, message, link) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      type,
+      from_user_id: fromUserId,
+      message,
+      link,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating notification:', error);
+    return null;
+  }
+
+  return data;
+}
+
+// Fetch notifications for a user
+export async function fetchNotifications(userId, limit = 50) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select(`
+      *,
+      from_user:from_user_id(id, name, main_photo)
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+
+  return data.map(n => ({
+    ...n,
+    fromUser: n.from_user ? {
+      id: n.from_user.id,
+      name: n.from_user.name,
+      photo: fixPhotoUrl(n.from_user.main_photo),
+    } : null,
+  }));
+}
+
+// Get unread notification count
+export async function getUnreadNotificationCount(userId) {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) {
+    console.error('Error getting unread count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+// Mark notification as read
+export async function markNotificationRead(notificationId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', notificationId);
+
+  if (error) {
+    console.error('Error marking notification read:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Mark all notifications as read
+export async function markAllNotificationsRead(userId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) {
+    console.error('Error marking all notifications read:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// ============================================
+// DEFAULT MODERATOR FUNCTIONS
+// ============================================
+
+// Default moderator email (Christine)
+const DEFAULT_MODERATOR_EMAIL = 'christinetshiba@gmail.com';
+
+// Get Christine's user ID by email
+export async function getDefaultModeratorId() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', DEFAULT_MODERATOR_EMAIL)
+    .single();
+
+  if (error) {
+    console.error('Error fetching default moderator:', error);
+    return null;
+  }
+
+  return data?.id || null;
+}
+
+// Ensure a community has at least one moderator
+// If no moderators exist, add Christine as a moderator
+export async function ensureCommunityHasModerator(communityId) {
+  // First check if community has any moderators or admins
+  const { data: moderators, error: modError } = await supabase
+    .from('community_members')
+    .select('id')
+    .eq('community_id', communityId)
+    .in('role', ['admin', 'moderator'])
+    .limit(1);
+
+  if (modError) {
+    console.error('Error checking moderators:', modError);
+    return { error: modError };
+  }
+
+  // If there are already moderators, do nothing
+  if (moderators && moderators.length > 0) {
+    return { hasModeratorAlready: true };
+  }
+
+  // No moderators found, add Christine
+  const christineId = await getDefaultModeratorId();
+  if (!christineId) {
+    console.error('Default moderator (Christine) not found in database');
+    return { error: { message: 'Default moderator not found' } };
+  }
+
+  // Add Christine as moderator - use insert and handle duplicate gracefully
+  const { error: addError } = await supabase
+    .from('community_members')
+    .insert({
+      community_id: communityId,
+      user_id: christineId,
+      role: 'moderator',
+    });
+
+  // Ignore duplicate key error (23505) - Christine might already be a member
+  if (addError && addError.code !== '23505') {
+    console.error('Error adding default moderator:', addError);
+    return { error: addError };
+  }
+
+  // If she was already a member but not a moderator, update her role
+  if (addError && addError.code === '23505') {
+    const { error: updateError } = await supabase
+      .from('community_members')
+      .update({ role: 'moderator' })
+      .eq('community_id', communityId)
+      .eq('user_id', christineId);
+
+    if (updateError) {
+      console.error('Error updating default moderator role:', updateError);
+      return { error: updateError };
+    }
+  }
+
+  return { addedDefaultModerator: true, moderatorId: christineId };
+}
+
+// Update a user's role in a community
+export async function updateCommunityMemberRole(communityId, userId, newRole) {
+  // First check if user is already a member
+  const { data: existing, error: checkError } = await supabase
+    .from('community_members')
+    .select('id, role')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .single();
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('Error checking membership:', checkError);
+    return { error: checkError };
+  }
+
+  if (existing) {
+    // Update existing membership
+    const { error: updateError } = await supabase
+      .from('community_members')
+      .update({ role: newRole })
+      .eq('community_id', communityId)
+      .eq('user_id', userId);
+
+    if (updateError) {
+      console.error('Error updating role:', updateError);
+      return { error: updateError };
+    }
+  } else {
+    // Insert new membership
+    const { error: insertError } = await supabase
+      .from('community_members')
+      .insert({
+        community_id: communityId,
+        user_id: userId,
+        role: newRole,
+      });
+
+    if (insertError) {
+      console.error('Error adding member:', insertError);
+      return { error: insertError };
+    }
+  }
+
+  return { success: true };
+}
+
+// Remove moderator/admin role (demote to member)
+export async function demoteCommunityMember(communityId, userId) {
+  const { error } = await supabase
+    .from('community_members')
+    .update({ role: 'member' })
+    .eq('community_id', communityId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error demoting member:', error);
+    return { error };
+  }
+
+  return { success: true };
+}
+
+// ============================================
+// COMMUNITY JOIN REQUEST FUNCTIONS
+// ============================================
+
+// Create a join request for a semi-public community
+export async function createJoinRequest(communityId, userId, message = null) {
+  const { data, error } = await supabase
+    .from('community_join_requests')
+    .insert({
+      community_id: communityId,
+      user_id: userId,
+      message: message?.trim() || null,
+      status: 'pending',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') { // Duplicate - already requested
+      return { data: null, alreadyRequested: true };
+    }
+    console.error('Error creating join request:', error);
+    return { error };
+  }
+
+  return { data };
+}
+
+// Check if user has a pending join request
+export async function hasPendingJoinRequest(communityId, userId) {
+  const { data, error } = await supabase
+    .from('community_join_requests')
+    .select('id, status')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error checking join request:', error);
+    return false;
+  }
+
+  return !!data;
+}
+
+// Get user's join request status for a community
+export async function getJoinRequestStatus(communityId, userId) {
+  const { data, error } = await supabase
+    .from('community_join_requests')
+    .select('id, status, created_at')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error getting join request status:', error);
+    return null;
+  }
+
+  return data;
+}
+
+// Fetch pending join requests for a community (for admins/moderators)
+export async function fetchPendingJoinRequests(communityId) {
+  const { data, error } = await supabase
+    .from('community_join_requests')
+    .select(`
+      *,
+      user:user_id(id, name, main_photo, short_description, new_location)
+    `)
+    .eq('community_id', communityId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching pending join requests:', error);
+    return [];
+  }
+
+  return data.map(r => ({
+    ...r,
+    user: r.user ? {
+      id: r.user.id,
+      name: r.user.name,
+      photo: fixPhotoUrl(r.user.main_photo),
+      bio: r.user.short_description,
+      location: r.user.new_location,
+    } : null,
+  }));
+}
+
+// Get pending join request count for a community
+export async function getPendingJoinRequestCount(communityId) {
+  const { count, error } = await supabase
+    .from('community_join_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('community_id', communityId)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('Error getting pending request count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+// Approve a join request
+export async function approveJoinRequest(requestId, reviewerId, communityId, userId) {
+  // Update the request status
+  const { error: updateError } = await supabase
+    .from('community_join_requests')
+    .update({
+      status: 'approved',
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  if (updateError) {
+    console.error('Error approving join request:', updateError);
+    return { error: updateError };
+  }
+
+  // Add user to community_members
+  const { error: memberError } = await supabase
+    .from('community_members')
+    .insert({
+      community_id: communityId,
+      user_id: userId,
+      role: 'member',
+    });
+
+  if (memberError && memberError.code !== '23505') {
+    console.error('Error adding member:', memberError);
+    return { error: memberError };
+  }
+
+  // Get the community name to add to user's profile
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  // Also add to user's communities array in profile
+  if (community) {
+    await joinCommunity(userId, community.name);
+  }
+
+  return { success: true };
+}
+
+// Reject a join request
+export async function rejectJoinRequest(requestId, reviewerId) {
+  const { error } = await supabase
+    .from('community_join_requests')
+    .update({
+      status: 'rejected',
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  if (error) {
+    console.error('Error rejecting join request:', error);
+    return { error };
+  }
+
+  return { success: true };
+}
+
+// Fetch all created communities with visibility filter
+// For explore page - show public and semi-public only (private are hidden from non-members)
+export async function fetchDiscoverableCommunities() {
+  const { data, error } = await supabase
+    .from('communities')
+    .select(`
+      *,
+      member_count:community_members(count)
+    `)
+    .in('visibility', ['public', 'semi-public'])
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching discoverable communities:', error);
+    return [];
+  }
+
+  return data.map(c => ({
+    ...c,
+    memberCount: c.member_count?.[0]?.count || 0,
+  }));
+}
+
+// ============================================
+// USER PRIVACY SETTINGS
+// ============================================
+
+// Get user's privacy setting
+export async function getUserPrivacySetting(userId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('privacy_setting')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching privacy setting:', error);
+    return 'public'; // Default to public
+  }
+
+  return data?.privacy_setting || 'public';
+}
+
+// Update user's privacy setting
+export async function updateUserPrivacySetting(userId, setting) {
+  const { error } = await supabase
+    .from('users')
+    .update({ privacy_setting: setting })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Error updating privacy setting:', error);
+    return false;
+  }
+
+  return true;
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { fetchUsersByNames, fetchVouchersForUsers, fetchPairingsFor, fetchMessages } from '../lib/supabase';
-import { EyeSlash, ThumbsUp, Sparkle, Eye, Heart, Handshake } from '@phosphor-icons/react';
+import { EyeSlash, ThumbsUp, Sparkle, Eye, Heart, Handshake, ChatCircle } from '@phosphor-icons/react';
 import './MatchesPage.css';
 
 const UserCard = ({ user, vouchers, messages, currentUserId, compact = false, showActions = false }) => {
@@ -13,7 +13,7 @@ const UserCard = ({ user, vouchers, messages, currentUserId, compact = false, sh
     if (fallbacks.length > 0 && e.target.src !== fallbacks[0]) {
       e.target.src = fallbacks[0].startsWith('//') ? 'https:' + fallbacks[0] : fallbacks[0];
     } else {
-      e.target.src = 'https://via.placeholder.com/200?text=No+Photo';
+      e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
     }
   };
 
@@ -28,7 +28,7 @@ const UserCard = ({ user, vouchers, messages, currentUserId, compact = false, sh
     return (
       <Link to={`/user/${user.id}`} className="user-card-compact">
         <img
-          src={user.mainPhoto || user.photos?.[0] || 'https://via.placeholder.com/50?text=?'}
+          src={user.mainPhoto || user.photos?.[0] || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
           alt={user.name}
           onError={fallbackPhoto}
         />
@@ -49,7 +49,7 @@ const UserCard = ({ user, vouchers, messages, currentUserId, compact = false, sh
         <Link to={`/user/${user.id}`} className="user-card-link">
           <div className="user-card-image">
             <img
-              src={user.mainPhoto || user.photos?.[0] || 'https://via.placeholder.com/200?text=No+Photo'}
+              src={user.mainPhoto || user.photos?.[0] || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
               alt={user.name}
               onError={fallbackPhoto}
             />
@@ -68,7 +68,7 @@ const UserCard = ({ user, vouchers, messages, currentUserId, compact = false, sh
             {vouchers && vouchers.length > 0 && (
               <div className="user-card-vouchers">
                 {vouchers.slice(0, 5).map((v, i) => (
-                  <img key={i} src={v.photo || 'https://via.placeholder.com/24?text=?'} alt={v.name} title={v.name} />
+                  <img key={i} src={v.photo || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'} alt={v.name} title={v.name} />
                 ))}
                 {vouchers.length > 5 && <span className="voucher-count">+{vouchers.length - 5}</span>}
               </div>
@@ -88,18 +88,12 @@ const UserCard = ({ user, vouchers, messages, currentUserId, compact = false, sh
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* Message CTA */}
       {showActions && (
         <div className="card-actions">
-          <button className="card-action-btn">
-            <EyeSlash size={16} className="action-icon" /> Hide
-          </button>
-          <button className="card-action-btn">
-            <Eye size={16} className="action-icon" /> Mark as seen
-          </button>
-          <button className="card-action-btn primary">
-            <ThumbsUp size={16} className="action-icon" /> We've met/talked!
-          </button>
+          <Link to={`/chat/${user.id}`} className="message-cta" onClick={(e) => e.stopPropagation()}>
+            <ChatCircle size={18} weight="fill" /> Message
+          </Link>
         </div>
       )}
     </div>
@@ -244,7 +238,7 @@ const MatchesPage = () => {
           {suitorsUsers.length > 0 && (
             <section className="matches-section">
               <h2 className="section-title">
-                Interested in you <Eye size={20} weight="fill" className="section-icon" />
+                Interested in you
                 <span className="section-subtitle">These people liked you or are checking out your profile in the sorting phase. Your response helps inform their spot in the directory</span>
               </h2>
               <div className="users-grid">

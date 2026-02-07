@@ -1,0 +1,264 @@
+.edit-community-modal {
+  max-width: 420px;
+}
+
+.edit-community-form {
+  padding: 1.25rem;
+}
+
+.edit-community-form .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.edit-community-form .form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.edit-community-form .form-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* Photo Edit Area */
+.edit-community-form .photo-edit-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.edit-community-form .photo-preview-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.edit-community-form .photo-preview-container.gradient-1 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.edit-community-form .photo-preview-container.gradient-2 {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.edit-community-form .photo-preview-container.gradient-3 {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.edit-community-form .photo-preview-container.gradient-4 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.edit-community-form .photo-preview-container.gradient-5 {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.edit-community-form .photo-preview-container.gradient-6 {
+  background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+}
+
+.edit-community-form .photo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.edit-community-form .photo-placeholder-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.edit-community-form .photo-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.edit-community-form .photo-preview-container:hover .photo-overlay {
+  opacity: 1;
+}
+
+.edit-community-form .photo-overlay span {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.edit-community-form .photo-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.edit-community-form .hidden-input {
+  display: none;
+}
+
+/* Read-only fields */
+.edit-community-form .readonly-field {
+  padding: 0.625rem 0.75rem;
+  background: var(--surface, #f5f5f5);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Form Actions */
+.edit-community-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.edit-community-form .btn-secondary {
+  padding: 0.65rem 1.25rem;
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.edit-community-form .btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.edit-community-form .btn-primary {
+  padding: 0.65rem 1.25rem;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.edit-community-form .btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.edit-community-form .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Danger Zone */
+.edit-community-form .danger-zone {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.edit-community-form .danger-zone h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #dc2626;
+  margin: 0 0 0.75rem 0;
+}
+
+.edit-community-form .delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.edit-community-form .delete-btn:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.edit-community-form .delete-confirm {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.edit-community-form .delete-warning {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.edit-community-form .delete-warning svg {
+  flex-shrink: 0;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.edit-community-form .delete-warning p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #7f1d1d;
+  line-height: 1.4;
+}
+
+.edit-community-form .delete-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.edit-community-form .btn-danger {
+  padding: 0.6rem 1rem;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: white;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.edit-community-form .btn-danger:hover {
+  background: #b91c1c;
+}
+
+.edit-community-form .btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

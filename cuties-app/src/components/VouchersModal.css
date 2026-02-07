@@ -46,7 +46,7 @@
 .vouchers-modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
-  color: #1a1a2e;
+  color: var(--navy);
 }
 
 .close-btn {
@@ -66,7 +66,7 @@
 }
 
 .close-btn:hover {
-  background: #f0f0f0;
+  background: var(--gray-300);
 }
 
 .vouchers-tabs {
@@ -87,12 +87,12 @@
 }
 
 .vouchers-tab:hover {
-  color: #1a1a2e;
-  background: #f8f8f8;
+  color: var(--navy);
+  background: var(--gray-100);
 }
 
 .vouchers-tab.active {
-  color: #1a1a2e;
+  color: var(--navy);
   font-weight: 600;
 }
 
@@ -103,7 +103,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #1a1a2e;
+  background: var(--navy);
 }
 
 .vouchers-list {
@@ -124,7 +124,7 @@
 }
 
 .voucher-item:hover {
-  background: #f5f5f5;
+  background: var(--gray-200);
 }
 
 .voucher-avatar {
@@ -136,7 +136,7 @@
 
 .voucher-name {
   font-weight: 500;
-  color: #1a1a2e;
+  color: var(--navy);
 }
 
 .no-vouchers {

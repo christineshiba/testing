@@ -1,16 +1,28 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Gift } from '@phosphor-icons/react';
+import { getUnreadNotificationCount } from '../../lib/supabase';
+import { Gift, Bell, Compass, Gear } from '@phosphor-icons/react';
 import './Header.css';
 
 const Header = () => {
-  const { isAuthenticated, logout } = useApp();
-  const navigate = useNavigate();
+  const { isAuthenticated, currentUser } = useApp();
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (currentUser) {
+        const count = await getUnreadNotificationCount(currentUser.id);
+        setUnreadCount(count);
+      }
+    };
+
+    fetchUnreadCount();
+
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   return (
     <header className="header">
@@ -23,10 +35,13 @@ const Header = () => {
           {isAuthenticated ? (
             <>
               <Link to="/invite" className="nav-link">
-                <Gift size={16} weight="fill" className="nav-icon" /> Invite friends
+                <Gift size={16} weight="fill" className="nav-icon" /> Invite
               </Link>
-              <Link to="/directory" className="nav-link">
-                Directory
+              <Link to="/explore" className="nav-link">
+                <Compass size={16} weight="duotone" className="nav-icon" /> Explore
+              </Link>
+              <Link to="/my-communities" className="nav-link">
+                My Spaces
               </Link>
               <Link to="/profile" className="nav-link">
                 My Profile
@@ -37,12 +52,23 @@ const Header = () => {
               <Link to="/messages" className="nav-link">
                 Messages
               </Link>
-              <button onClick={handleLogout} className="nav-link">
-                Log out
-              </button>
+              <Link to="/notifications" className="nav-link nav-link-with-badge">
+                <Bell size={16} weight="regular" className="nav-icon" />
+                Notifs
+                {unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
+              </Link>
+              <Link to="/settings" className="nav-link">
+                <Gear size={16} weight="regular" className="nav-icon" />
+                Settings
+              </Link>
             </>
           ) : (
             <>
+              <Link to="/explore" className="nav-link">
+                <Compass size={16} weight="duotone" className="nav-icon" /> Explore
+              </Link>
               <Link to="/signup" className="nav-link signup-btn">
                 Sign up
               </Link>

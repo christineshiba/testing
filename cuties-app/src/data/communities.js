@@ -46,23 +46,7 @@ export const communityDescriptions = {
   'Less Wrong': 'Rationality and AI safety focused community',
   'Effective Altruism': 'Doing the most good through evidence and reason',
   'Word Hack': 'Language and wordplay enthusiast community',
-  'Crypto': 'Web3 builders, traders, and decentralization enthusiasts',
-  'Farcaster': 'Decentralized social network community',
-  'Solarpunk': 'Optimistic futurists building sustainable communities',
-  'FuturePARTS': 'Creative technologists exploring art and technology',
-  'Zuzalu': 'Pop-up city community exploring new ways of living',
-  'Network State': 'Building digital-first communities and governance',
-  'Tech': 'Builders, founders, and technologists shaping the future',
-  'AI': 'Exploring artificial intelligence and its implications',
-  'NYC': 'New York City community of ambitious builders',
-  'SF': 'San Francisco Bay Area tech and startup community',
-  'LA': 'Los Angeles creatives, founders, and dreamers',
-  'Austin': 'Texas tech and creative community',
-  'Berlin': 'European hub for artists, techies, and free spirits',
-  'London': 'UK community of builders and thinkers',
   'Burning Man': 'Burners and radical self-expression enthusiasts',
-  'Founders': 'Startup founders and entrepreneurs',
-  'Coliving': 'Community living and intentional housing',
 };
 
 // Convert slug to community name - must match exactly what's in database
@@ -115,24 +99,7 @@ export function slugToName(slug) {
     'less-wrong': 'Less Wrong',
     'effective-altruism': 'Effective Altruism',
     'word-hack': 'Word Hack',
-    // Additional
-    'crypto': 'Crypto',
-    'farcaster': 'Farcaster',
-    'solarpunk': 'Solarpunk',
-    'futureparts': 'FuturePARTS',
-    'zuzalu': 'Zuzalu',
-    'network-state': 'Network State',
-    'tech': 'Tech',
-    'ai': 'AI',
-    'nyc': 'NYC',
-    'sf': 'SF',
-    'la': 'LA',
-    'austin': 'Austin',
-    'berlin': 'Berlin',
-    'london': 'London',
     'burning-man': 'Burning Man',
-    'founders': 'Founders',
-    'coliving': 'Coliving',
   };
 
   if (slugMappings[slug.toLowerCase()]) {

@@ -42,7 +42,7 @@ const VouchersModal = ({ isOpen, onClose, vouchersFor, vouchedBy, userName }) =>
                 onClick={onClose}
               >
                 <img
-                  src={voucher.photo || 'https://via.placeholder.com/40?text=?'}
+                  src={voucher.photo || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
                   alt={voucher.name}
                   className="voucher-avatar"
                 />

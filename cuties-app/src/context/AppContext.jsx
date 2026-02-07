@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase, fetchUsers, fetchUserById, fetchMutualMatches, fetchMessages, transformUser } from '../lib/supabase';
+import { supabase, fetchUsers, fetchUserById, fetchMutualMatches, fetchMessages, transformUser, fetchProjectsFor, saveProjectsFor } from '../lib/supabase';
 
 const AppContext = createContext();
 
@@ -55,7 +55,11 @@ export const AppProvider = ({ children }) => {
         }
 
         if (userData) {
-          setCurrentUser(transformUser(userData));
+          const transformedUser = transformUser(userData);
+          // Load projects for the user
+          const projects = await fetchProjectsFor(userData.id);
+          transformedUser.projects = projects;
+          setCurrentUser(transformedUser);
           setIsAuthenticated(true);
         }
       }
@@ -85,7 +89,11 @@ export const AppProvider = ({ children }) => {
           }
 
           if (userData) {
-            setCurrentUser(transformUser(userData));
+            const transformedUser = transformUser(userData);
+            // Load projects for the user
+            const projects = await fetchProjectsFor(userData.id);
+            transformedUser.projects = projects;
+            setCurrentUser(transformedUser);
             setIsAuthenticated(true);
           }
         }, 500);
@@ -178,20 +186,60 @@ export const AppProvider = ({ children }) => {
     // Update local state immediately
     setCurrentUser(prev => ({ ...prev, ...updates }));
 
+    // Build database update object
+    const dbUpdates = {
+      name: updates.name,
+      short_description: updates.quickBio,
+      long_description: updates.freeformDescription || updates.bio,
+      new_location: updates.location,
+      age: updates.age,
+      pronouns: updates.gender,
+      here_for: updates.hereFor,
+      communities: updates.communities,
+      topics: updates.interests?.join(', '),
+      main_photo: updates.photos?.[0] || updates.mainPhoto,
+      photos: updates.morePhotos?.filter(Boolean) || [],
+      social_x_handle: updates.socials?.twitter,
+      social_ig_handle: updates.socials?.instagram,
+      social_substack_handle: updates.socials?.substack,
+      social_youtube_handle: updates.socials?.youtube,
+      spotify_url: updates.spotify,
+      youtube_url: updates.youtube,
+      tweet1_url: updates.tweets?.[0] || null,
+      tweet2_url: updates.tweets?.[1] || null,
+      tweet3_url: updates.tweets?.[2] || null,
+      question: updates.promptQuestion,
+      height_feet: updates.heightFeet,
+      height_inches: updates.heightInches,
+      sexuality: updates.sexuality,
+      mono_poly: updates.monoPoly,
+      kids: updates.kids,
+      drugs: updates.drugs,
+    };
+
+    // Remove undefined values
+    Object.keys(dbUpdates).forEach(key => {
+      if (dbUpdates[key] === undefined) {
+        delete dbUpdates[key];
+      }
+    });
+
     // Update in database
     const { error } = await supabase
       .from('users')
-      .update({
-        name: updates.name,
-        short_description: updates.quickBio,
-        long_description: updates.bio,
-        location: updates.location,
-        // Add more fields as needed
-      })
+      .update(dbUpdates)
       .eq('id', currentUser.id);
 
     if (error) {
       console.error('Error updating user:', error);
+    }
+
+    // Save projects separately if provided
+    if (updates.projects !== undefined) {
+      const { error: projectsError } = await saveProjectsFor(currentUser.id, updates.projects);
+      if (projectsError) {
+        console.error('Error saving projects:', projectsError);
+      }
     }
   };
 
@@ -283,6 +331,36 @@ export const AppProvider = ({ children }) => {
     return await fetchUserById(id);
   }, [users]);
 
+  // Refresh current user data from database
+  // Use this after mutations that change user data (e.g., joining/leaving communities)
+  const refreshCurrentUser = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) return;
+
+    let { data: userData } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', session.user.id)
+      .single();
+
+    if (!userData) {
+      const { data: emailUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', session.user.email)
+        .single();
+      userData = emailUser;
+    }
+
+    if (userData) {
+      const transformedUser = transformUser(userData);
+      const projects = await fetchProjectsFor(userData.id);
+      transformedUser.projects = projects;
+      setCurrentUser(transformedUser);
+    }
+  }, []);
+
   const value = {
     currentUser,
     users,
@@ -301,6 +379,7 @@ export const AppProvider = ({ children }) => {
     loadMoreUsers: () => loadUsers(false),
     searchUsers,
     refreshUsers: () => loadUsers(true),
+    refreshCurrentUser,
     getMatchedUsers: () => matches,
     getUserById,
   };

@@ -1,60 +1,64 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate, Link, useParams } from 'react-router-dom';
-import { fetchProjectsFor, fetchTestimonialsFor, fetchVouchersFor, fetchVouchedBy, checkHasVouched, addVouch, removeVouch } from '../lib/supabase';
+import { fetchProjectsFor, fetchTestimonialsFor, fetchVouchersFor, fetchVouchedBy, checkHasVouched, addVouch, removeVouch, createNotification, fetchUserCommunities } from '../lib/supabase';
 import VouchersModal from '../components/VouchersModal';
+import { PageLoading } from '../components/Loading';
+import DOMPurify from 'dompurify';
 import {
   User, Cake, MapPin, XLogo, InstagramLogo, Article, YoutubeLogo,
-  HandWaving, Heart, ChatCircle, Handshake, MusicNote, Play, Check
+  HandWaving, Heart, ChatCircle, Handshake, MusicNote, Play, Check, UsersThree
 } from '@phosphor-icons/react';
 import './ProfilePage.css';
 
 // Twitter Embed Component
 const TweetEmbed = ({ tweetUrl }) => {
   const containerRef = useRef(null);
-  const createdRef = useRef(false);
   const tweetId = getTweetIdFromUrl(tweetUrl);
 
   useEffect(() => {
     if (!tweetId || !containerRef.current) return;
 
-    // Prevent duplicate creation
-    if (createdRef.current) return;
+    const container = containerRef.current;
 
-    // Clear any existing content first
-    containerRef.current.innerHTML = '';
+    // Check if already embedded or in progress
+    if (container.dataset.tweetLoaded === 'true' || container.dataset.tweetLoading === 'true') {
+      return;
+    }
+
+    // Mark as loading
+    container.dataset.tweetLoading = 'true';
 
     const createTweet = () => {
-      if (window.twttr && containerRef.current && !createdRef.current) {
-        createdRef.current = true;
-        window.twttr.widgets.createTweet(tweetId, containerRef.current, {
+      if (window.twttr && container && container.dataset.tweetLoaded !== 'true') {
+        window.twttr.widgets.createTweet(tweetId, container, {
           theme: 'light',
           width: 300,
+        }).then(() => {
+          container.dataset.tweetLoaded = 'true';
+          container.dataset.tweetLoading = 'false';
         });
       }
     };
 
     // Load Twitter widget script if not already loaded
     if (!window.twttr) {
-      const script = document.createElement('script');
-      script.src = 'https://platform.twitter.com/widgets.js';
-      script.async = true;
-      script.onload = createTweet;
-      document.body.appendChild(script);
+      const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.src = 'https://platform.twitter.com/widgets.js';
+        script.async = true;
+        script.onload = createTweet;
+        document.body.appendChild(script);
+      } else {
+        // Script exists but twttr not ready yet
+        existingScript.addEventListener('load', createTweet);
+      }
     } else if (window.twttr.widgets) {
-      // Script already loaded and ready
       createTweet();
     } else {
-      // Script loaded but not ready, wait for it
       window.twttr.ready(createTweet);
     }
-
-    return () => {
-      createdRef.current = false;
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-    };
   }, [tweetId]);
 
   if (!tweetId) return null;
@@ -118,6 +122,8 @@ const ProfilePage = () => {
   const [vouchedBy, setVouchedBy] = useState([]);
   const [hasVouched, setHasVouched] = useState(false);
   const [showVouchersModal, setShowVouchersModal] = useState(false);
+  const [userCommunities, setUserCommunities] = useState([]);
+  const [showAllCommunities, setShowAllCommunities] = useState(false);
 
   // Determine if viewing own profile or someone else's
   const isOwnProfile = !userId || userId === String(currentUser?.id);
@@ -142,18 +148,20 @@ const ProfilePage = () => {
       if (user) {
         setProfileUser(user);
 
-        // Fetch projects, testimonials, and vouchers for this user
-        const [projects, testimonials, vouchersReceived, vouchesGiven] = await Promise.all([
+        // Fetch projects, testimonials, vouchers, and communities for this user
+        const [projects, testimonials, vouchersReceived, vouchesGiven, communities] = await Promise.all([
           fetchProjectsFor(user.id),
           fetchTestimonialsFor(user.id),
           fetchVouchersFor(user.id),
           fetchVouchedBy(user.id),
+          fetchUserCommunities(user.id, user.communities),
         ]);
 
         setUserProjects(projects);
         setUserTestimonials(testimonials);
         setVouchersFor(vouchersReceived);
         setVouchedBy(vouchesGiven);
+        setUserCommunities(communities);
 
         // Check if current user has vouched for this profile
         if (!isOwnProfile && currentUser) {
@@ -174,11 +182,7 @@ const ProfilePage = () => {
   if (loading) {
     return (
       <div className="profile-page">
-        <div className="profile-container">
-          <div className="profile-card main-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p>Loading...</p>
-          </div>
-        </div>
+        <PageLoading message="Loading profile..." />
       </div>
     );
   }
@@ -264,18 +268,25 @@ const ProfilePage = () => {
           <div className="profile-layout">
             <div className="profile-photo-container">
               <img
-                src={profileUser.mainPhoto || profileUser.photos?.[0] || 'https://via.placeholder.com/400?text=No+Photo'}
+                src={profileUser.mainPhoto || profileUser.photos?.[0] || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
                 alt={profileUser.name}
                 className="profile-main-photo"
                 onError={(e) => {
+                  // Prevent infinite error loops
+                  if (e.target.dataset.fallbackAttempted) {
+                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
+                    return;
+                  }
+                  e.target.dataset.fallbackAttempted = 'true';
+
                   // Try fallback photos if main photo fails (e.g., HEIC format)
                   const fallbacks = (profileUser.morePhotos || profileUser.photos || []).filter(p =>
-                    p && (p.toLowerCase().endsWith('.jpg') || p.toLowerCase().endsWith('.jpeg') || p.toLowerCase().endsWith('.png'))
+                    p && (p.toLowerCase().endsWith('.jpg') || p.toLowerCase().endsWith('.jpeg') || p.toLowerCase().endsWith('.png') || p.toLowerCase().endsWith('.webp'))
                   );
-                  if (fallbacks.length > 0 && e.target.src !== fallbacks[0]) {
+                  if (fallbacks.length > 0) {
                     e.target.src = fallbacks[0].startsWith('//') ? 'https:' + fallbacks[0] : fallbacks[0];
                   } else {
-                    e.target.src = 'https://via.placeholder.com/400?text=No+Photo';
+                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
                   }
                 }}
               />
@@ -343,13 +354,37 @@ const ProfilePage = () => {
             <div className="profile-actions">
               <button
                 className={`action-btn interest-btn ${isInterested ? 'active' : ''}`}
-                onClick={() => setIsInterested(!isInterested)}
+                onClick={async () => {
+                  if (!isInterested && profileUser && currentUser) {
+                    // Create notification when indicating interest
+                    await createNotification(
+                      profileUser.id,
+                      'interest',
+                      currentUser.id,
+                      null,
+                      `/user/${currentUser.id}`
+                    );
+                  }
+                  setIsInterested(!isInterested);
+                }}
               >
                 {isInterested ? <><Check size={16} weight="bold" /> Interested</> : <><HandWaving size={16} /> Indicate interest</>}
               </button>
               <button
                 className={`action-btn like-btn ${isLiked ? 'active' : ''}`}
-                onClick={() => setIsLiked(!isLiked)}
+                onClick={async () => {
+                  if (!isLiked && profileUser && currentUser) {
+                    // Create notification when liking
+                    await createNotification(
+                      profileUser.id,
+                      'like',
+                      currentUser.id,
+                      null,
+                      `/user/${currentUser.id}`
+                    );
+                  }
+                  setIsLiked(!isLiked);
+                }}
               >
                 {isLiked ? <><Heart size={16} weight="fill" /> Liked</> : <><Heart size={16} /> Like profile</>}
               </button>
@@ -372,7 +407,7 @@ const ProfilePage = () => {
                     {vouchersFor.slice(0, 8).map((voucher) => (
                       <img
                         key={voucher.id}
-                        src={voucher.photo || 'https://via.placeholder.com/32?text=?'}
+                        src={voucher.photo || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
                         alt={voucher.name}
                         className="avatar-small"
                         title={voucher.name}
@@ -403,110 +438,176 @@ const ProfilePage = () => {
           </div>
         </section>
 
-        {/* Currently Listening */}
-        <section className="profile-card">
-          <h2 className="card-title">Currently listening</h2>
-          <div className="spotify-embed">
-            {profileUser.spotify && getSpotifyEmbedUrl(profileUser.spotify) ? (
-              <iframe
-                src={getSpotifyEmbedUrl(profileUser.spotify)}
-                width="100%"
-                height="152"
-                frameBorder="0"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-                className="spotify-iframe"
-              />
-            ) : profileUser.spotify ? (
-              <div className="embed-placeholder spotify">
-                <div className="embed-content">
-                  <MusicNote size={24} className="embed-icon" />
-                  <span>Invalid Spotify URL</span>
+        {/* Currently Listening - only show if user has Spotify link */}
+        {profileUser.spotify && (
+          <section className="profile-card">
+            <h2 className="card-title">Currently listening</h2>
+            <div className="spotify-embed">
+              {getSpotifyEmbedUrl(profileUser.spotify) ? (
+                <iframe
+                  src={getSpotifyEmbedUrl(profileUser.spotify)}
+                  width="100%"
+                  height="152"
+                  frameBorder="0"
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  className="spotify-iframe"
+                />
+              ) : (
+                <div className="embed-placeholder spotify">
+                  <div className="embed-content">
+                    <MusicNote size={24} className="embed-icon" />
+                    <span>Invalid Spotify URL</span>
+                  </div>
+                  <p className="embed-link">{profileUser.spotify}</p>
                 </div>
-                <p className="embed-link">{profileUser.spotify}</p>
-              </div>
-            ) : (
-              <div className="embed-placeholder spotify">
-                <div className="embed-content">
-                  <MusicNote size={24} className="embed-icon" />
-                  <span>No track added</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+              )}
+            </div>
+          </section>
+        )}
 
-        {/* Video */}
-        <section className="profile-card">
-          <h2 className="card-title">Video</h2>
-          <div className="video-embed">
-            {profileUser.youtube && getYouTubeEmbedUrl(profileUser.youtube) ? (
-              <iframe
-                src={getYouTubeEmbedUrl(profileUser.youtube)}
-                width="100%"
-                height="315"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                loading="lazy"
-                className="youtube-iframe"
-              />
-            ) : profileUser.youtube ? (
-              <div className="embed-placeholder video">
-                <Play size={32} weight="fill" />
-                <p>Invalid YouTube URL</p>
-              </div>
-            ) : (
-              <div className="embed-placeholder video">
-                <Play size={32} weight="fill" />
-                <p>No video added</p>
-              </div>
-            )}
-          </div>
-        </section>
+        {/* Video - only show if user has YouTube link */}
+        {profileUser.youtube && (
+          <section className="profile-card">
+            <h2 className="card-title">Video</h2>
+            <div className="video-embed">
+              {getYouTubeEmbedUrl(profileUser.youtube) ? (
+                <iframe
+                  src={getYouTubeEmbedUrl(profileUser.youtube)}
+                  width="100%"
+                  height="315"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  loading="lazy"
+                  className="youtube-iframe"
+                />
+              ) : (
+                <div className="embed-placeholder video">
+                  <Play size={32} weight="fill" />
+                  <p>Invalid YouTube URL</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Communities & Interests */}
         <section className="profile-card">
           <h2 className="card-title">Communities & interests</h2>
-          <div className="interests-row">
-            {interests.map((interest, idx) => (
-              <span key={idx} className="interest-pill">{interest}</span>
-            ))}
-          </div>
-          {communities.length > 0 && (
-            <div className="communities-list">
-              {communities.map((community, idx) => (
-                <div key={idx} className="community-row">
-                  <span className="community-letter">{community.charAt(0)}</span>
-                  <span className="community-name">{community}</span>
-                </div>
+          {userCommunities.length > 0 && (
+            <>
+              <div className="profile-communities-grid">
+                {(showAllCommunities ? userCommunities : userCommunities.slice(0, 8)).map((community, idx) => (
+                  <Link
+                    key={community.id || idx}
+                    to={`/community/${community.slug}`}
+                    className="profile-community-card"
+                  >
+                    {community.photo_url ? (
+                      <img
+                        src={community.photo_url}
+                        alt={community.name}
+                        className="profile-community-avatar"
+                      />
+                    ) : (
+                      <div className={`profile-community-avatar gradient-${(idx % 6) + 1}`}>
+                        <UsersThree size={20} weight="fill" />
+                      </div>
+                    )}
+                    <div className="profile-community-info">
+                      <span className="profile-community-name">{community.name}</span>
+                      {community.role && (
+                        <span className="profile-community-role">{community.role}</span>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {userCommunities.length > 8 && (
+                <button
+                  className="view-more-communities-btn"
+                  onClick={() => setShowAllCommunities(!showAllCommunities)}
+                >
+                  {showAllCommunities ? 'Show less' : `View all ${userCommunities.length} communities`}
+                </button>
+              )}
+            </>
+          )}
+          {interests.length > 0 && (
+            <div className="interests-row" style={{ marginTop: userCommunities.length > 0 ? '1rem' : 0 }}>
+              {interests.map((interest, idx) => (
+                <Link
+                  key={idx}
+                  to={`/directory?interest=${encodeURIComponent(interest)}`}
+                  className="interest-pill"
+                >
+                  {interest}
+                </Link>
               ))}
             </div>
           )}
         </section>
 
-        {/* A few tweets of mine */}
-        <section className="profile-card">
-          <h2 className="card-title">A few tweets of mine</h2>
-          <div className="tweets-row">
-            {(tweets.length > 0 && tweets.some(t => t && getTweetIdFromUrl(t))) ? (
-              tweets.filter(t => t && getTweetIdFromUrl(t)).slice(0, 3).map((tweetUrl, idx) => (
+        {/* Dating - only show if user has any dating info */}
+        {(profileUser.sexuality || profileUser.monoPoly || profileUser.kids || profileUser.drugs || profileUser.heightFeet) && (
+          <section className="profile-card">
+            <h2 className="card-title">Dating</h2>
+            <div className="dating-info">
+              {profileUser.heightFeet && (
+                <div className="dating-row">
+                  <span className="dating-label">Height</span>
+                  <span className="dating-value">{profileUser.heightFeet}'{profileUser.heightInches || 0}"</span>
+                </div>
+              )}
+              {profileUser.sexuality && (
+                <div className="dating-row">
+                  <span className="dating-label">Sexuality</span>
+                  <span className="dating-value">{profileUser.sexuality}</span>
+                </div>
+              )}
+              {profileUser.monoPoly && (
+                <div className="dating-row">
+                  <span className="dating-label">Relationship style</span>
+                  <span className="dating-value">{profileUser.monoPoly}</span>
+                </div>
+              )}
+              {profileUser.kids && (
+                <div className="dating-row">
+                  <span className="dating-label">Kids</span>
+                  <span className="dating-value">{profileUser.kids}</span>
+                </div>
+              )}
+              {profileUser.drugs && (
+                <div className="dating-row">
+                  <span className="dating-label">Drugs</span>
+                  <span className="dating-value">{profileUser.drugs}</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* A few tweets of mine - only show if user has tweets */}
+        {tweets.length > 0 && tweets.some(t => t && getTweetIdFromUrl(t)) && (
+          <section className="profile-card">
+            <h2 className="card-title">A few tweets of mine</h2>
+            <div className="tweets-row">
+              {tweets.filter(t => t && getTweetIdFromUrl(t)).slice(0, 3).map((tweetUrl, idx) => (
                 <div key={idx} className="tweet-embed-wrapper">
                   <TweetEmbed tweetUrl={tweetUrl} />
                 </div>
-              ))
-            ) : (
-              <p className="empty-text">No tweets added yet</p>
-            )}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
-        {/* My Projects */}
-        <section className="profile-card">
-          <h2 className="card-title">My projects</h2>
-          <div className="projects-row">
-            {(projects.length > 0 && projects.some(p => p.title)) ? (
-              projects.filter(p => p.title).map((project, idx) => (
+        {/* My Projects - only show if user has projects */}
+        {projects.length > 0 && projects.some(p => p.title) && (
+          <section className="profile-card">
+            <h2 className="card-title">My projects</h2>
+            <div className="projects-row">
+              {projects.filter(p => p.title).map((project, idx) => (
                 <div key={project.id || idx} className="project-card">
                   <div className="project-image">
                     {(project.image || project.photo) ? (
@@ -521,12 +622,10 @@ const ProfilePage = () => {
                     {project.link && <a href={project.link} target="_blank" rel="noopener noreferrer" className="project-link">{project.link}</a>}
                   </div>
                 </div>
-              ))
-            ) : (
-              <p className="empty-text">No projects added yet</p>
-            )}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Description */}
         <section className="profile-card">
@@ -540,9 +639,9 @@ const ProfilePage = () => {
               ))}
             </div>
           )}
-          <div className="description-text">
+          <div className="description-text rich-content">
             {profileUser.freeformDescription || profileUser.bio ? (
-              <div dangerouslySetInnerHTML={{ __html: (profileUser.freeformDescription || profileUser.bio).replace(/\n/g, '<br/>') }} />
+              <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(profileUser.freeformDescription || profileUser.bio) }} />
             ) : profileUser.quickBio ? (
               <>
                 <p><strong>{profileUser.quickBio}</strong></p>
@@ -569,12 +668,12 @@ const ProfilePage = () => {
                 <div key={testimonial.id} className="review-item">
                   <p className="review-text">"{testimonial.content}"</p>
                   {testimonial.author && (
-                    <div className="review-author">
+                    <Link to={`/user/${testimonial.author.id}`} className="review-author">
                       {testimonial.author.photo && (
                         <img src={testimonial.author.photo} alt={testimonial.author.name} className="review-author-photo" />
                       )}
                       <span className="review-author-name">— {testimonial.author.name}</span>
-                    </div>
+                    </Link>
                   )}
                 </div>
               ))
@@ -584,37 +683,6 @@ const ProfilePage = () => {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="profile-footer">
-          <div className="footer-content">
-            <div className="footer-brand">
-              <span className="footer-logo">Cuties!</span>
-              <span className="footer-tagline">made by @christinewi</span>
-            </div>
-            <div className="footer-links">
-              <div className="footer-column">
-                <span className="footer-heading">Product</span>
-                <a href="#">Overview</a>
-                <a href="#">Customers</a>
-              </div>
-              <div className="footer-column">
-                <span className="footer-heading">Company</span>
-                <a href="#">About</a>
-                <a href="#">Jobs</a>
-              </div>
-              <div className="footer-column">
-                <span className="footer-heading">Support</span>
-                <a href="#">FAQs</a>
-                <a href="#">Contact Us</a>
-              </div>
-              <div className="footer-column">
-                <span className="footer-heading">Legal</span>
-                <a href="#">Terms</a>
-                <a href="#">Privacy</a>
-              </div>
-            </div>
-          </div>
-        </footer>
       </div>
 
       {/* Vouchers Modal */}

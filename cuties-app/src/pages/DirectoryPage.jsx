@@ -1,15 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import { useApp } from '../context/AppContext';
-import { useNavigate, Link } from 'react-router-dom';
-import { fetchVouchersForUsers } from '../lib/supabase';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { fetchVouchersForUsers, fetchAllCommunities } from '../lib/supabase';
 import { initPlacesAutocomplete } from '../lib/geo';
 import { MagnifyingGlass, X, Sliders } from '@phosphor-icons/react';
+import { PageLoading, SkeletonCard, Spinner } from '../components/Loading';
 import './DirectoryPage.css';
-
-const COMMUNITIES = [
-  'Tpot', 'Vibecamp', 'Fractal', 'SF Commons', 'Crypto', 'Farcaster',
-  'Outdoor climbing', 'Solarpunk', 'FuturePARTS', 'Interintellect'
-];
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -26,12 +22,13 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 const DirectoryPage = () => {
   const { users, isAuthenticated, currentUser, usersLoading, hasMore, loadMoreUsers, searchUsers, refreshUsers, loading } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   const [filters, setFilters] = useState({
     search: '',
     community: '',
-    interests: '',
+    interests: searchParams.get('interest') || '',
     location: '',
     locationRadius: 25,
     gender: '',
@@ -55,25 +52,50 @@ const DirectoryPage = () => {
   const [userCoords, setUserCoords] = useState({});
   const locationInputRef = useRef(null);
   const [userVouchers, setUserVouchers] = useState({});
+  const [communities, setCommunities] = useState([]);
   const navigate = useNavigate();
   const searchTimeoutRef = useRef(null);
+  const lastSearchRef = useRef('');
+  const initialLoadDone = useRef(false);
+
+  // Fetch all communities from database on mount
+  useEffect(() => {
+    const loadCommunities = async () => {
+      const allCommunities = await fetchAllCommunities();
+      setCommunities(allCommunities);
+    };
+    loadCommunities();
+  }, []);
 
   // Debounced search - triggers API call when user stops typing
+  // Combines text search and interests filter for server-side searching
   useEffect(() => {
+    const searchTerm = filters.search || filters.interests;
+
+    // Skip if search hasn't actually changed
+    if (searchTerm === lastSearchRef.current && initialLoadDone.current) {
+      return;
+    }
+
     // Clear any existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // If search is empty, refresh to get default users
-    if (!filters.search) {
-      refreshUsers();
+    // If search is empty and we had a previous search, refresh to get default users
+    if (!searchTerm) {
+      if (lastSearchRef.current !== '' || !initialLoadDone.current) {
+        lastSearchRef.current = '';
+        initialLoadDone.current = true;
+        refreshUsers();
+      }
       return;
     }
 
     // Debounce the search by 300ms
     searchTimeoutRef.current = setTimeout(() => {
-      searchUsers(filters.search);
+      lastSearchRef.current = searchTerm;
+      searchUsers(searchTerm);
     }, 300);
 
     return () => {
@@ -81,7 +103,7 @@ const DirectoryPage = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [filters.search, searchUsers, refreshUsers]);
+  }, [filters.search, filters.interests, searchUsers, refreshUsers]);
 
   // Fetch vouchers for displayed users
   useEffect(() => {
@@ -198,9 +220,7 @@ const DirectoryPage = () => {
   if (loading) {
     return (
       <div className="directory-page">
-        <div className="loading-indicator">
-          <p>Loading...</p>
-        </div>
+        <PageLoading message="Loading directory..." />
       </div>
     );
   }
@@ -212,6 +232,14 @@ const DirectoryPage = () => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
+    // Update URL params for interest filter
+    if (field === 'interests') {
+      if (value) {
+        setSearchParams({ interest: value });
+      } else {
+        setSearchParams({});
+      }
+    }
   };
 
   const resetFilters = () => {
@@ -236,6 +264,7 @@ const DirectoryPage = () => {
     setTempRadius(25);
     setSelectedCoords(null);
     setTempCoords(null);
+    setSearchParams({});
   };
 
   const filteredUsers = useMemo(() => {
@@ -307,11 +336,13 @@ const DirectoryPage = () => {
       }
     }
 
-    // Gender filter
+    // Gender filter - normalize by removing spaces for flexible matching
     if (filters.gender) {
-      result = result.filter(u =>
-        u.gender?.toLowerCase().includes(filters.gender.toLowerCase())
-      );
+      const normalizedFilter = filters.gender.toLowerCase().replace(/\s+/g, '');
+      result = result.filter(u => {
+        const normalizedGender = u.gender?.toLowerCase().replace(/\s+/g, '') || '';
+        return normalizedGender.includes(normalizedFilter) || normalizedFilter.includes(normalizedGender);
+      });
     }
 
     // Here for filter
@@ -333,7 +364,7 @@ const DirectoryPage = () => {
 
     // Relationship style filter
     if (filters.relationship) {
-      result = result.filter(u => u.relationship === filters.relationship);
+      result = result.filter(u => u.monoPoly === filters.relationship);
     }
 
     // Nomadic filter
@@ -370,11 +401,6 @@ const DirectoryPage = () => {
   return (
     <div className="directory-page">
       <div className="directory-container">
-        <h1 className="directory-title">cuties! directory</h1>
-        <p className="directory-subtitle">
-          Make IRL connections faster. Find the others within your existing community.
-        </p>
-
         {/* Search, Sort, and Filters - All on one line */}
         <div className="filters-row">
           <div className="search-bar-container">
@@ -397,9 +423,9 @@ const DirectoryPage = () => {
             onChange={(e) => handleFilterChange('gender', e.target.value)}
           >
             <option value="">Gender</option>
-            <option value="She / Her">She / Her</option>
-            <option value="He / Him">He / Him</option>
-            <option value="They / Them">They / Them</option>
+            <option value="she/her">She/Her</option>
+            <option value="he/him">He/Him</option>
+            <option value="they/them">They/Them</option>
           </select>
 
           <div className="location-filter-wrapper">
@@ -674,17 +700,26 @@ const DirectoryPage = () => {
             >
               <div className="profile-image">
                 <img
-                  src={user.mainPhoto || user.photos?.[0] || 'https://via.placeholder.com/400x400?text=No+Photo'}
+                  src={user.mainPhoto || user.photos?.[0] || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
                   alt={user.name}
+                  loading="lazy"
+                  decoding="async"
                   onError={(e) => {
+                    // Prevent infinite error loops
+                    if (e.target.dataset.fallbackAttempted) {
+                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
+                      return;
+                    }
+                    e.target.dataset.fallbackAttempted = 'true';
+
                     // Try fallback photos if main photo fails (e.g., HEIC format)
                     const fallbacks = (user.photos || []).filter(p =>
-                      p && (p.toLowerCase().endsWith('.jpg') || p.toLowerCase().endsWith('.jpeg') || p.toLowerCase().endsWith('.png'))
+                      p && (p.toLowerCase().endsWith('.jpg') || p.toLowerCase().endsWith('.jpeg') || p.toLowerCase().endsWith('.png') || p.toLowerCase().endsWith('.webp'))
                     );
-                    if (fallbacks.length > 0 && e.target.src !== fallbacks[0]) {
+                    if (fallbacks.length > 0) {
                       e.target.src = fallbacks[0].startsWith('//') ? 'https:' + fallbacks[0] : fallbacks[0];
                     } else {
-                      e.target.src = 'https://via.placeholder.com/400x400?text=No+Photo';
+                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
                     }
                   }}
                 />
@@ -720,7 +755,7 @@ const DirectoryPage = () => {
                     {userVouchers[user.id].slice(0, 4).map((voucher, idx) => (
                       <img
                         key={idx}
-                        src={voucher.photo || 'https://via.placeholder.com/28?text=?'}
+                        src={voucher.photo || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'}
                         alt={voucher.name}
                         className="card-voucher-avatar"
                         title={`Vouched by ${voucher.name}`}
@@ -738,13 +773,14 @@ const DirectoryPage = () => {
 
         {usersLoading && (
           <div className="loading-indicator">
+            <Spinner />
             <p>Loading profiles...</p>
           </div>
         )}
 
         {!usersLoading && hasMore && filteredUsers.length > 0 && (
           <div className="load-more-container">
-            <button className="load-more-btn" onClick={loadMoreUsers}>
+            <button className="btn btn-primary btn-lg" onClick={loadMoreUsers}>
               Load More
             </button>
           </div>
@@ -785,7 +821,7 @@ const DirectoryPage = () => {
                 onChange={(e) => handleFilterChange('community', e.target.value)}
               >
                 <option value="">All Communities</option>
-                {COMMUNITIES.map(c => (
+                {communities.map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>

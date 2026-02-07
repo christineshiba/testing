@@ -1,19 +1,35 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase, transformUser } from '../lib/supabase';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase, joinMainCommunity } from '../lib/supabase';
 import { useApp } from '../context/AppContext';
+import { Eye, EyeSlash } from '@phosphor-icons/react';
 import './AuthPages.css';
 
 const AuthCallback = () => {
   const [error, setError] = useState('');
+  const [isRecovery, setIsRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
   const navigate = useNavigate();
-  const { } = useApp(); // Just to trigger re-render when auth state changes
+  const [searchParams] = useSearchParams();
+  const _appContext = useApp(); // Just to trigger re-render when auth state changes
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        // Check if this is a password recovery flow
+        const type = searchParams.get('type');
+
         // Get the session from the URL hash
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (type === 'recovery' && session) {
+          setIsRecovery(true);
+          return;
+        }
 
         if (sessionError) {
           throw sessionError;
@@ -65,17 +81,24 @@ const AuthCallback = () => {
           localStorage.removeItem('pendingSignup');
 
           // Create new user profile
-          const { error: insertError } = await supabase
+          const { data: newUser, error: insertError } = await supabase
             .from('users')
             .insert({
               name: name,
               username: name,
               email: authUser.email,
               auth_id: authUser.id,
-            });
+            })
+            .select()
+            .single();
 
           if (insertError) {
             throw insertError;
+          }
+
+          // Auto-join the main community
+          if (newUser) {
+            await joinMainCommunity(newUser.id);
           }
 
           // Go to edit profile for new users
@@ -84,16 +107,23 @@ const AuthCallback = () => {
         }
 
         // No pending signup and no existing profile - create minimal profile
-        const { error: insertError } = await supabase
+        const { data: newUser, error: insertError } = await supabase
           .from('users')
           .insert({
             name: authUser.email.split('@')[0],
             email: authUser.email,
             auth_id: authUser.id,
-          });
+          })
+          .select()
+          .single();
 
         if (insertError) {
           throw insertError;
+        }
+
+        // Auto-join the main community
+        if (newUser) {
+          await joinMainCommunity(newUser.id);
         }
 
         navigate('/profile/edit');
@@ -104,7 +134,117 @@ const AuthCallback = () => {
     };
 
     handleCallback();
-  }, [navigate]);
+  }, [navigate, searchParams]);
+
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setPasswordUpdated(true);
+    } catch (err) {
+      setError(err.message || 'Failed to update password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Password updated successfully
+  if (passwordUpdated) {
+    return (
+      <div className="auth-page">
+        <div className="auth-container">
+          <div className="auth-card">
+            <h1 className="auth-title">Password updated</h1>
+            <p className="auth-message">Your password has been successfully updated.</p>
+            <button
+              className="auth-submit"
+              onClick={() => navigate('/directory')}
+            >
+              Continue to app
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Password recovery form
+  if (isRecovery) {
+    return (
+      <div className="auth-page">
+        <div className="auth-container">
+          <div className="auth-card">
+            <h1 className="auth-title">Set new password</h1>
+            <p className="auth-subtitle">Enter your new password below</p>
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <form onSubmit={handlePasswordUpdate} className="auth-form">
+              <div className="form-group">
+                <label htmlFor="newPassword">New password</label>
+                <div className="password-input-wrapper">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="newPassword"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="confirmPassword">Confirm password</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="auth-submit" disabled={loading}>
+                {loading ? 'Updating...' : 'Update password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase, createGroupConversation, fetchUsers } from '../lib/supabase';
 import { ChatCircle, UsersThree, X, Plus } from '@phosphor-icons/react';
+import { PageLoading, Spinner } from '../components/Loading';
 import './MessagesPage.css';
 
 const MessagesPage = () => {
@@ -156,7 +157,7 @@ const MessagesPage = () => {
 
   // Fix protocol-relative URLs
   const fixPhotoUrl = (url) => {
-    if (!url) return 'https://via.placeholder.com/50?text=?';
+    if (!url) return 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
     if (url.startsWith('//')) return 'https:' + url;
     return url;
   };
@@ -172,9 +173,7 @@ const MessagesPage = () => {
   if (loading) {
     return (
       <div className="messages-page">
-        <div className="messages-container">
-          <p className="loading-text">Loading...</p>
-        </div>
+        <PageLoading message="Loading messages..." />
       </div>
     );
   }
@@ -190,7 +189,7 @@ const MessagesPage = () => {
         <div className="messages-header">
           <h1 className="messages-title">Messages</h1>
           <button
-            className="new-group-btn"
+            className="btn btn-primary btn-sm"
             onClick={() => setShowNewGroupModal(true)}
           >
             <Plus size={16} weight="bold" /> New Group
@@ -226,7 +225,7 @@ const MessagesPage = () => {
                     alt={convo.name}
                     className="conversation-avatar"
                     onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/50?text=?';
+                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e0e0e0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
                     }}
                   />
                 )}
