@@ -202,30 +202,6 @@ const DirectoryContent = () => {
     };
   }, [users, locationFilterActive, selectedCoords, mapsReady]);
 
-  // Show login prompt if not authenticated
-  if (!isAuthenticated && !loading) {
-    return (
-      <div className="directory-content">
-        <div className="directory-login-prompt">
-          <h3>Sign in to browse the directory</h3>
-          <p>Connect with interesting people in your communities</p>
-          <Link to="/login" className="login-btn">Log in</Link>
-          <Link to="/signup" className="signup-link">or create an account</Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="directory-content">
-        <div className="loading-indicator">
-          <p>Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
     if (field === 'interests') {
@@ -370,6 +346,30 @@ const DirectoryContent = () => {
 
     return result;
   }, [users, currentUser, filters, sortBy, ageFilterActive, locationFilterActive, selectedCoords, userCoords]);
+
+  // Show login prompt if not authenticated
+  if (!isAuthenticated && !loading) {
+    return (
+      <div className="directory-content">
+        <div className="directory-login-prompt">
+          <h3>Sign in to browse the directory</h3>
+          <p>Connect with interesting people in your communities</p>
+          <Link to="/login" className="login-btn">Log in</Link>
+          <Link to="/signup" className="signup-link">or create an account</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="directory-content">
+        <div className="loading-indicator">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="directory-content">
