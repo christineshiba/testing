@@ -164,12 +164,17 @@ const CommunitiesContent = () => {
       }
     });
 
-    // Sort: admin first, then moderator, then by selected sort
+    // Sort: admin first, then moderator, then user-created before cuties, then by selected sort
     const roleOrder = { admin: 0, moderator: 1 };
     return communities.sort((a, b) => {
       const aOrder = roleOrder[a.userRole] ?? 2;
       const bOrder = roleOrder[b.userRole] ?? 2;
       if (aOrder !== bOrder) return aOrder - bOrder;
+
+      // User-created communities before cuties official
+      if (a.isCutiesOfficial !== b.isCutiesOfficial) {
+        return a.isCutiesOfficial ? 1 : -1;
+      }
 
       // Apply selected sort
       if (sortBy === 'alphabetical') {
