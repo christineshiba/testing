@@ -187,8 +187,13 @@ const LandingPage = () => {
       }
     });
 
-    // Sort by member count descending
-    return communities.sort((a, b) => b.memberCount - a.memberCount);
+    // Sort: user-created first, then by member count descending
+    return communities.sort((a, b) => {
+      if (a.isCreated !== b.isCreated) {
+        return a.isCreated ? -1 : 1;
+      }
+      return b.memberCount - a.memberCount;
+    });
   };
 
   const handleCommunityClick = (slug) => {
