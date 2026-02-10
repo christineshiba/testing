@@ -278,19 +278,6 @@ const CommunitiesContent = () => {
                 className="community-card"
                 onClick={() => handleCommunityClick(community.slug)}
               >
-                <div className="card-badges">
-                  {community.isCutiesOfficial && (
-                    <span className="cuties-badge" title="Cuties Official Community">
-                      <Orange size={12} weight="fill" className="cuties-badge-icon" />
-                      <span className="cuties-badge-text">Cuties!</span>
-                    </span>
-                  )}
-                  {community.userRole && (community.userRole === 'admin' || community.userRole === 'moderator') && (
-                    <span className={`role-badge ${community.userRole}`}>
-                      {community.userRole}
-                    </span>
-                  )}
-                </div>
                 <div className="community-card-content">
                   {community.photo ? (
                     <img src={community.photo} alt="" className="community-card-avatar" />
@@ -298,14 +285,29 @@ const CommunitiesContent = () => {
                     <div className={`community-card-avatar gradient-${(index % 6) + 1}`} />
                   )}
                   <div className="community-card-info">
-                    <h3 className="community-name">
-                      {community.name}
-                      {community.visibility === 'semi-public' && (
-                        <span className="visibility-badge semi-public" title="Requires approval to join">
-                          <UsersThree size={10} weight="bold" />
-                        </span>
-                      )}
-                    </h3>
+                    <div className="community-card-header">
+                      <h3 className="community-name">
+                        {community.name}
+                        {community.visibility === 'semi-public' && (
+                          <span className="visibility-badge semi-public" title="Requires approval to join">
+                            <UsersThree size={10} weight="bold" />
+                          </span>
+                        )}
+                      </h3>
+                      <div className="card-badges">
+                        {community.isCutiesOfficial && (
+                          <span className="cuties-badge" title="Cuties Official Community">
+                            <Orange size={12} weight="fill" className="cuties-badge-icon" />
+                            <span className="cuties-badge-text">Cuties!</span>
+                          </span>
+                        )}
+                        {community.userRole && (community.userRole === 'admin' || community.userRole === 'moderator') && (
+                          <span className={`role-badge ${community.userRole}`}>
+                            {community.userRole}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     <p className="community-description">{community.description}</p>
                     <div className="community-meta">
                       <span className="community-member-count">
